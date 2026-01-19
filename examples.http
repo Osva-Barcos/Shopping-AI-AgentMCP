@@ -1,0 +1,80 @@
+# Ejemplos de Requests HTTP
+# Para usar con curl, Postman, Insomnia, etc.
+
+BASE_URL="http://localhost:8787"
+
+### Health Check
+GET {{BASE_URL}}/health
+
+### ========================================
+### PRODUCTOS
+### ========================================
+
+### Listar todos los productos
+GET {{BASE_URL}}/products
+
+### Buscar productos
+GET {{BASE_URL}}/products?search=mouse
+
+### Obtener producto específico
+GET {{BASE_URL}}/products/prod_1
+
+### ========================================
+### CARRITOS
+### ========================================
+
+### Crear un carrito nuevo
+POST {{BASE_URL}}/carts
+Content-Type: application/json
+
+### Obtener carrito (reemplazar con ID real)
+GET {{BASE_URL}}/carts/cart_lx9k8m3n4p2
+
+### Agregar producto al carrito (qty por defecto = 1)
+POST {{BASE_URL}}/carts/cart_lx9k8m3n4p2/prod_1
+Content-Type: application/json
+
+### Agregar producto con cantidad específica
+POST {{BASE_URL}}/carts/cart_lx9k8m3n4p2/prod_2
+Content-Type: application/json
+
+{
+  "qty": 3
+}
+
+### Actualizar cantidad de un item
+PUT {{BASE_URL}}/carts/cart_lx9k8m3n4p2/items/item_abc123
+Content-Type: application/json
+
+{
+  "qty": 5
+}
+
+### Eliminar item del carrito
+DELETE {{BASE_URL}}/carts/cart_lx9k8m3n4p2/items/item_abc123
+
+### ========================================
+### CASOS DE ERROR
+### ========================================
+
+### Producto no existe (404)
+GET {{BASE_URL}}/products/prod_999
+
+### Stock insuficiente (409)
+POST {{BASE_URL}}/carts/cart_lx9k8m3n4p2/prod_1
+Content-Type: application/json
+
+{
+  "qty": 1000
+}
+
+### Cantidad inválida (400)
+PUT {{BASE_URL}}/carts/cart_lx9k8m3n4p2/items/item_abc123
+Content-Type: application/json
+
+{
+  "qty": -5
+}
+
+### Carrito no existe (404)
+GET {{BASE_URL}}/carts/cart_noexiste

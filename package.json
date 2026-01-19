@@ -1,0 +1,23 @@
+{
+  "name": "laburen-ai-agent-mcp",
+  "version": "1.0.0",
+  "description": "MCP HTTP backend para Agente de IA conversacional - Cloudflare Workers",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create laburen-ai-db",
+    "db:migrate": "wrangler d1 execute laburen-ai-db --file=./src/db/schema.sql",
+    "db:migrate:local": "wrangler d1 execute laburen-ai-db --local --file=./src/db/schema.sql",
+    "db:query": "wrangler d1 execute laburen-ai-db --command",
+    "tail": "wrangler tail"
+  },
+  "keywords": ["mcp", "cloudflare", "workers", "ai", "agent", "laburen"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240129.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.25.0"
+  }
+}

@@ -1,0 +1,14 @@
+name = "laburen-ai-agent-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-01-19"
+node_compat = true
+
+# Configuración de Cloudflare D1
+[[d1_databases]]
+binding = "DB" # Variable disponible en el código
+database_name = "laburen-ai-db"
+database_id = "" # Se completa después de crear la DB con: wrangler d1 create laburen-ai-db
+
+# Variables de entorno (opcional)
+[vars]
+ENVIRONMENT = "production"
