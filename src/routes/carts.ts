@@ -31,6 +31,11 @@ export class CartRoutes {
    */
   async getCart(cartId: string): Promise<Response> {
     try {
+      // FALLBACK: Si cart_id viene como placeholder literal
+      if (cartId === ':cart_id' || cartId === '{cart_id}') {
+        return errorResponse(400, 'Cart ID is required. Laburen debe enviar el cart_id real en la URL', 'VALIDATION_ERROR');
+      }
+      
       const cart = await this.cartService.getCartWithItems(cartId);
       return successResponse(cart);
     } catch (error) {
@@ -50,13 +55,42 @@ export class CartRoutes {
     try {
       const body = await request.json<AddToCartRequest>().catch(() => ({}));
       
-      if (!body.product_id) {
+      // FALLBACK: Si cart_id viene como :cart_id literal, intentar obtenerlo del body
+      if (cartId === ':cart_id' || cartId === '{cart_id}') {
+        cartId = (body as any).cart_id;
+        if (!cartId) {
+          return errorResponse(400, 'El campo cart_id es requerido (envíalo en la URL o en el body)', 'VALIDATION_ERROR');
+        }
+      }
+      
+      // LOG para debugging
+      console.log('[ADD_TO_CART] Received request:', {
+        cartId,
+        body: JSON.stringify(body),
+        product_id_type: typeof body.product_id,
+        product_id_value: body.product_id
+      });
+      
+      // Normalizar product_id (puede venir como número o string)
+      let productId = body.product_id;
+      if (!productId) {
         return errorResponse(400, 'El campo product_id es requerido', 'VALIDATION_ERROR');
       }
       
-      const qty = body.qty || 1;
+      // Convertir a string y formatear con padding si es necesario
+      productId = String(productId).padStart(4, '0');
+      console.log('[ADD_TO_CART] Normalized product_id:', productId);
+      
+      // Normalizar qty (puede venir como string o número, o vacío)
+      let qty = 1;
+      if (body.qty !== undefined && body.qty !== null && body.qty !== '') {
+        qty = Number(body.qty);
+        if (isNaN(qty) || qty <= 0) {
+          return errorResponse(400, 'El campo qty debe ser un número positivo', 'VALIDATION_ERROR');
+        }
+      }
 
-      const item = await this.cartService.addProductToCart(cartId, body.product_id, qty);
+      const item = await this.cartService.addProductToCart(cartId, productId, qty);
       return successResponse(item, 201);
     } catch (error) {
       return handleError(error);
@@ -76,11 +110,28 @@ export class CartRoutes {
     try {
       const body = await request.json<UpdateCartItemRequest>();
       
-      if (!body.qty || typeof body.qty !== 'number') {
-        return errorResponse(400, 'El campo qty es requerido y debe ser un número', 'VALIDATION_ERROR');
+      // FALLBACK: Si vienen como placeholders, obtenerlos del body
+      if (cartId === ':cart_id' || cartId === '{cart_id}') {
+        cartId = (body as any).cart_id || '';
+      }
+      if (itemId === ':item_id' || itemId === '{item_id}') {
+        itemId = (body as any).item_id || '';
+      }
+      if (!cartId || !itemId) {
+        return errorResponse(400, 'cart_id e item_id son requeridos (envíalos en el body)', 'VALIDATION_ERROR');
+      }
+      
+      // Normalizar qty (puede venir como string o número)
+      if (body.qty === undefined || body.qty === null || body.qty === '') {
+        return errorResponse(400, 'El campo qty es requerido', 'VALIDATION_ERROR');
+      }
+      
+      const qty = Number(body.qty);
+      if (isNaN(qty) || qty <= 0) {
+        return errorResponse(400, 'El campo qty debe ser un número positivo', 'VALIDATION_ERROR');
       }
 
-      const item = await this.cartService.updateCartItem(cartId, itemId, body.qty);
+      const item = await this.cartService.updateCartItem(cartId, itemId, qty);
       return successResponse(item);
     } catch (error) {
       return handleError(error);
@@ -92,8 +143,14 @@ export class CartRoutes {
    * Elimina un item del carrito
    */
   async removeCartItem(cartId: string, itemId: string): Promise<Response> {
-    try {
-      await this.cartService.removeCartItem(cartId, itemId);
+    try {      // FALLBACK: Si vienen como placeholders
+      if (cartId === ':cart_id' || cartId === '{cart_id}') {
+        return errorResponse(400, 'cart_id es requerido', 'VALIDATION_ERROR');
+      }
+      if (itemId === ':item_id' || itemId === '{item_id}') {
+        return errorResponse(400, 'item_id es requerido', 'VALIDATION_ERROR');
+      }
+            await this.cartService.removeCartItem(cartId, itemId);
       return successResponse({ message: 'Item eliminado correctamente' });
     } catch (error) {
       return handleError(error);

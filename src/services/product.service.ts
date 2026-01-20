@@ -32,11 +32,15 @@ export class ProductService {
    * Obtiene un producto por ID
    */
   async getProductById(id: string): Promise<Product> {
+    console.log('[PRODUCT_SERVICE] Looking for product with id:', id, 'type:', typeof id);
+    
     const product = await this.db.get<Product>(
       'SELECT * FROM products WHERE id = ?',
       id
     );
 
+    console.log('[PRODUCT_SERVICE] Query result:', product ? 'Found' : 'Not found');
+    
     if (!product) {
       throw new NotFoundError(`Producto con ID ${id} no encontrado`);
     }
