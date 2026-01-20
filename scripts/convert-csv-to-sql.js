@@ -25,7 +25,7 @@ function fixEncoding(text) {
 }
 
 // Leer el CSV
-const csvPath = 'products-utf8.csv';
+const csvPath = '../data/products-utf8.csv';
 console.log('📂 Leyendo CSV...\n');
 
 let content = fs.readFileSync(csvPath, 'utf-8');
@@ -75,7 +75,7 @@ const sqlStatements = products.map(p => {
 const sql = sqlStatements.join('\n');
 
 // Guardar SQL
-fs.writeFileSync('import-products.sql', sql);
+fs.writeFileSync('../data/import-products.sql', sql);
 
 console.log('✅ SQL generado: import-products.sql\n');
 
