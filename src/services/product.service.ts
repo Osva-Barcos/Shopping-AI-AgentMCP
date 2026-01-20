@@ -17,14 +17,14 @@ export class ProductService {
       return await this.db.all<Product>(
         `SELECT * FROM products 
          WHERE name LIKE ? OR description LIKE ?
-         ORDER BY name ASC`,
+         ORDER BY id ASC`,
         searchTerm,
         searchTerm
       );
     }
 
     return await this.db.all<Product>(
-      'SELECT * FROM products ORDER BY name ASC'
+      'SELECT * FROM products ORDER BY id ASC'
     );
   }
 

@@ -1,7 +1,7 @@
 // Rutas para carritos
 // POST /carts
 // GET /carts/:cart_id
-// POST /carts/:cart_id/:product_id
+// POST /carts/:cart_id/items
 // PUT /carts/:cart_id/items/:item_id
 // DELETE /carts/:cart_id/items/:item_id
 
@@ -39,20 +39,24 @@ export class CartRoutes {
   }
 
   /**
-   * POST /carts/:cart_id/:product_id
+   * POST /carts/:cart_id/items
    * Agrega un producto al carrito
-   * Body: { qty?: number }
+   * Body: { product_id: string, qty?: number }
    */
   async addProductToCart(
     cartId: string,
-    productId: string,
     request: Request
   ): Promise<Response> {
     try {
       const body = await request.json<AddToCartRequest>().catch(() => ({}));
+      
+      if (!body.product_id) {
+        return errorResponse(400, 'El campo product_id es requerido', 'VALIDATION_ERROR');
+      }
+      
       const qty = body.qty || 1;
 
-      const item = await this.cartService.addProductToCart(cartId, productId, qty);
+      const item = await this.cartService.addProductToCart(cartId, body.product_id, qty);
       return successResponse(item, 201);
     } catch (error) {
       return handleError(error);
@@ -112,9 +116,9 @@ export class CartRoutes {
       return this.getCart(pathParts[0]);
     }
 
-    // POST /carts/:cart_id/:product_id (agregar producto)
-    if (pathParts.length === 2 && method === 'POST') {
-      return this.addProductToCart(pathParts[0], pathParts[1], request);
+    // POST /carts/:cart_id/items (agregar producto)
+    if (pathParts.length === 2 && pathParts[1] === 'items' && method === 'POST') {
+      return this.addProductToCart(pathParts[0], request);
     }
 
     // PUT /carts/:cart_id/items/:item_id (actualizar cantidad)

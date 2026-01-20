@@ -9,7 +9,7 @@
  * - GET    /products/:id       - Obtiene un producto
  * - POST   /carts              - Crea un carrito nuevo
  * - GET    /carts/:cart_id     - Obtiene un carrito con items
- * - POST   /carts/:cart_id/:product_id - Agrega producto al carrito
+ * - POST   /carts/:cart_id/items - Agrega producto al carrito (body: {product_id, qty})
  * - PUT    /carts/:cart_id/items/:item_id - Actualiza cantidad de item
  * - DELETE /carts/:cart_id/items/:item_id - Elimina item del carrito
  */
@@ -20,6 +20,7 @@ import { ProductService } from './services/product.service';
 import { CartService } from './services/cart.service';
 import { ProductRoutes } from './routes/products';
 import { CartRoutes } from './routes/carts';
+import { AdminRoutes } from './routes/admin';
 import { errorResponse } from './utils/errors';
 
 export default {
@@ -48,6 +49,7 @@ export default {
       // Inicializar routers
       const productRoutes = new ProductRoutes(productService);
       const cartRoutes = new CartRoutes(cartService);
+      const adminRoutes = new AdminRoutes(productService);
 
       // Parsear path
       const pathSegments = path.split('/').filter(p => p.length > 0);
@@ -74,6 +76,8 @@ export default {
         response = await productRoutes.handleRequest(request, pathSegments.slice(1));
       } else if (pathSegments[0] === 'carts') {
         response = await cartRoutes.handleRequest(request, pathSegments.slice(1));
+      } else if (pathSegments[0] === 'admin') {
+        response = await adminRoutes.handleRequest(request, pathSegments.slice(1));
       } else {
         response = errorResponse(404, 'Ruta no encontrada', 'NOT_FOUND');
       }

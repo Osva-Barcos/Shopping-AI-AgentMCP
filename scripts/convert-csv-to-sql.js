@@ -7,11 +7,29 @@
 
 const fs = require('fs');
 
+// Función para limpiar caracteres mal codificados
+function fixEncoding(text) {
+  // Reemplazar caracteres mal codificados comunes
+  return text
+    .replace(/Ã±/g, 'ñ')
+    .replace(/Ã³/g, 'ó')
+    .replace(/Ã©/g, 'é')
+    .replace(/Ã¡/g, 'á')
+    .replace(/Ã­/g, 'í')
+    .replace(/Ãº/g, 'ú')
+    .replace(/Ã/g, 'Ñ')
+    .replace(/Â¿/g, '¿')
+    .replace(/Â¡/g, '¡')
+    .replace(/Ã"/g, 'Ó')
+    .replace(/Â/g, '');
+}
+
 // Leer el CSV
-const csvPath = 'products(Sheet1).csv';
+const csvPath = 'products-utf8.csv';
 console.log('📂 Leyendo CSV...\n');
 
-const content = fs.readFileSync(csvPath, 'utf-8');
+let content = fs.readFileSync(csvPath, 'utf-8');
+content = fixEncoding(content); // Aplicar corrección de codificación
 const lines = content.split('\n').filter(line => line.trim());
 
 // Parsear CSV (separado por ;)
@@ -27,7 +45,7 @@ for (let i = 1; i < lines.length; i++) { // Saltar header
   const name = `${tipo_prenda} ${color} Talla ${talla}`;
   
   // Construir descripción completa (combina categoría + descripción + precios por volumen)
-  const desc = `${descripcion.trim()} - Categoría: ${categoria}. Precios: 50u=$${precio_50}, 100u=$${precio_100}, 200u=$${precio_200}. ${disponible === 'Sí' || disponible === 'S�' ? 'Disponible' : 'No disponible'}`;
+  const desc = `${descripcion.trim()} - Categoría: ${categoria}. Precios: 50u=$${precio_50}, 100u=$${precio_100}, 200u=$${precio_200}`;
   
   // Usar el precio más común (precio_50_u) como precio base
   const price = Math.round(Number(precio_50) * 100); // Convertir a centavos
@@ -38,7 +56,8 @@ for (let i = 1; i < lines.length; i++) { // Saltar header
     name,
     description: desc,
     price,
-    stock
+    stock,
+    disponible: disponible.trim() // 'Sí' o 'No'
   });
 }
 
@@ -49,8 +68,9 @@ const sqlStatements = products.map(p => {
   // Escapar comillas simples
   const name = p.name.replace(/'/g, "''");
   const desc = p.description.replace(/'/g, "''");
+  const disp = p.disponible.replace(/'/g, "''");
   
-  return `INSERT INTO products (id, name, description, price, stock) VALUES ('${p.id}', '${name}', '${desc}', ${p.price}, ${p.stock});`;
+  return `INSERT INTO products (id, name, description, price, stock, disponible) VALUES ('${p.id}', '${name}', '${desc}', ${p.price}, ${p.stock}, '${disp}');`;
 });
 
 const sql = sqlStatements.join('\n');

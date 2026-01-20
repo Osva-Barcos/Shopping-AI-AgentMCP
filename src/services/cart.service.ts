@@ -116,7 +116,21 @@ export class CartService {
     await this.getCartById(cartId); // Valida que existe el carrito
     const product = await this.productService.getProductById(productId);
 
-    // Validar stock
+    // Validar que el producto esté marcado como disponible
+    if (product.disponible === 'No') {
+      throw new ConflictError(
+        `Producto no disponible. "${product.name}" no está disponible para la venta actualmente.`
+      );
+    }
+
+    // Validar que el producto tenga stock
+    if (product.stock === 0) {
+      throw new ConflictError(
+        `Producto sin stock. "${product.name}" no tiene unidades disponibles.`
+      );
+    }
+
+    // Validar stock suficiente
     if (product.stock < qty) {
       throw new ConflictError(
         `Stock insuficiente. Disponible: ${product.stock}, solicitado: ${qty}`

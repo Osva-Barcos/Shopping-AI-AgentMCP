@@ -7,7 +7,7 @@ node_compat = true
 [[d1_databases]]
 binding = "DB" # Variable disponible en el código
 database_name = "laburen-ai-db"
-database_id = "" # Se completa después de crear la DB con: wrangler d1 create laburen-ai-db
+database_id = "dcc0ae8b-aa76-4250-ad47-0780867c6e96" # Se completa después de crear la DB con: wrangler d1 create laburen-ai-db
 
 # Variables de entorno (opcional)
 [vars]
