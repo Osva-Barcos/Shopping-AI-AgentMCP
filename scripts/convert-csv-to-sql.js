@@ -57,7 +57,7 @@ for (let i = 1; i < lines.length; i++) { // Saltar header
     description: desc,
     price,
     stock,
-    disponible: disponible.trim() // 'Sí' o 'No'
+    available: disponible.trim() === 'Sí' ? 'Yes' : 'No' // Convert to English
   });
 }
 
@@ -68,9 +68,8 @@ const sqlStatements = products.map(p => {
   // Escapar comillas simples
   const name = p.name.replace(/'/g, "''");
   const desc = p.description.replace(/'/g, "''");
-  const disp = p.disponible.replace(/'/g, "''");
   
-  return `INSERT INTO products (id, name, description, price, stock, disponible) VALUES ('${p.id}', '${name}', '${desc}', ${p.price}, ${p.stock}, '${disp}');`;
+  return `INSERT INTO products (id, name, description, price, stock, available) VALUES ('${p.id}', '${name}', '${desc}', ${p.price}, ${p.stock}, '${p.available}');`;
 });
 
 const sql = sqlStatements.join('\n');

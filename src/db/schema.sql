@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT,
   price INTEGER NOT NULL, -- Precio en centavos para evitar decimales
   stock INTEGER NOT NULL DEFAULT 0,
-  disponible TEXT DEFAULT 'Sí' -- 'Sí' o 'No'
+  available TEXT DEFAULT 'Yes' -- 'Yes' or 'No'
 );
 
 -- Tabla de carritos

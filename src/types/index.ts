@@ -14,7 +14,7 @@ export interface Product {
   description: string | null;
   price: number; // En centavos
   stock: number;
-  disponible?: string; // 'Sí' o 'No'
+  available?: string; // 'Yes' | 'No'
 }
 
 export interface Cart {

@@ -117,9 +117,9 @@ export class CartService {
     const product = await this.productService.getProductById(productId);
 
     // Validar que el producto esté marcado como disponible
-    if (product.disponible === 'No') {
+    if (product.available === 'No') {
       throw new ConflictError(
-        `Producto no disponible. "${product.name}" no está disponible para la venta actualmente.`
+        `Product not available. "${product.name}" is not available for sale.`
       );
     }
 
