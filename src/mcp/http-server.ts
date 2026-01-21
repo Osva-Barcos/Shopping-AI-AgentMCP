@@ -94,6 +94,60 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
+  // Endpoint REST simple para llamadas directas (sin SSE)
+  if (req.url === '/api/tools/call' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+      try {
+        const { tool, args } = JSON.parse(body);
+        console.log(`🔧 Llamando herramienta: ${tool}`, args);
+        
+        const apiClient = new ApiClient(API_URL);
+        
+        // Llamar directamente a la herramienta
+        let result;
+        switch (tool) {
+          case 'list_products':
+            result = await apiClient.listProducts(args?.search);
+            break;
+          case 'get_product':
+            result = await apiClient.getProduct(args.product_id);
+            break;
+          case 'search_products':
+            result = await apiClient.searchProducts(args.query);
+            break;
+          case 'create_cart':
+            result = await apiClient.createCart();
+            break;
+          case 'add_to_cart':
+            result = await apiClient.addToCart(args.cart_id, args.product_id, args.qty);
+            break;
+          case 'get_cart':
+            result = await apiClient.getCart(args.cart_id);
+            break;
+          case 'remove_from_cart':
+            result = await apiClient.removeFromCart(args.cart_id, args.item_id);
+            break;
+          default:
+            throw new Error(`Herramienta no encontrada: ${tool}`);
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, data: result }));
+        console.log(`✅ Herramienta ${tool} ejecutada exitosamente`);
+      } catch (error: any) {
+        console.error('❌ Error ejecutando herramienta:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: error.message }));
+      }
+    });
+    return;
+  }
+
   // Health check
   if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -102,7 +156,8 @@ const httpServer = createServer(async (req, res) => {
       service: 'Laburen MCP HTTP Server',
       version: '1.0.0',
       endpoints: {
-        sse: '/sse',
+        sse: '/sse (MCP protocol)',
+        api: '/api/tools/call (REST simple)',
         health: '/health'
       },
       api_url: API_URL,
