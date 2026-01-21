@@ -221,9 +221,24 @@ export class CartRoutes {
       return this.addProductToCart(pathParts[0], request);
     }
 
+    // POST /carts/items?cart_id=xxx (agregar producto por query)
+    if (pathParts.length === 1 && pathParts[0] === 'items' && method === 'POST') {
+      return this.addProductToCart('', request);
+    }
+
     // PUT /carts/:cart_id/items/:item_id (actualizar cantidad)
     if (pathParts.length === 3 && pathParts[1] === 'items' && method === 'PUT') {
       return this.updateCartItem(pathParts[0], pathParts[2], request);
+    }
+
+    // PUT /carts/items?cart_id=xxx&item_id=xxx (actualizar por query)
+    if (pathParts.length === 1 && pathParts[0] === 'items' && method === 'PUT') {
+      return this.updateCartItem('', '', request);
+    }
+
+    // DELETE /carts/items?cart_id=xxx&item_id=xxx (eliminar por query)
+    if (pathParts.length === 1 && pathParts[0] === 'items' && method === 'DELETE') {
+      return this.removeCartItem('', '', request);
     }
 
     // DELETE /carts/:cart_id/items/:item_id (eliminar item)
