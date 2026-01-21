@@ -32,6 +32,34 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
+  // Endpoint POST para recibir mensajes MCP
+  if (req.url === '/sse' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+      try {
+        const message = JSON.parse(body);
+        console.log('📨 Mensaje POST recibido:', message);
+        
+        // Procesar el mensaje y devolver respuesta
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id || 1,
+          result: { status: 'received' }
+        }));
+      } catch (error) {
+        console.error('Error procesando mensaje:', error);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      }
+    });
+    return;
+  }
+
   // Endpoint SSE para MCP
   if (req.url === '/sse' && req.method === 'GET') {
     console.log('📡 Nueva conexión SSE desde:', req.socket.remoteAddress);
