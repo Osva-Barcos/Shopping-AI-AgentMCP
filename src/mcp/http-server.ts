@@ -118,7 +118,7 @@ const httpServer = createServer(async (req, res) => {
             result = await apiClient.getProduct(args.product_id);
             break;
           case 'search_products':
-            result = await apiClient.searchProducts(args.query);
+            result = await apiClient.listProducts(args.query); // search usa listProducts
             break;
           case 'create_cart':
             result = await apiClient.createCart();
@@ -130,7 +130,7 @@ const httpServer = createServer(async (req, res) => {
             result = await apiClient.getCart(args.cart_id);
             break;
           case 'remove_from_cart':
-            result = await apiClient.removeFromCart(args.cart_id, args.item_id);
+            result = await apiClient.removeCartItem(args.cart_id, args.item_id);
             break;
           default:
             throw new Error(`Herramienta no encontrada: ${tool}`);
