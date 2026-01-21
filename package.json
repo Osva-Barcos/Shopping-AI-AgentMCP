@@ -11,7 +11,6 @@
     "start": "node dist/mcp/http-server.js",
     "mcp": "node dist/mcp/index.js",
     "mcp:http": "node dist/mcp/http-server.js",
-    "test:railway": "node scripts/test-railway-setup.js",
     "db:create": "wrangler d1 create laburen-ai-db",
     "db:migrate": "wrangler d1 execute laburen-ai-db --file=./src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute laburen-ai-db --local --file=./src/db/schema.sql",

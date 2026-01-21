@@ -22,6 +22,7 @@ import { ProductRoutes } from './routes/products';
 import { CartRoutes } from './routes/carts';
 import { AdminRoutes } from './routes/admin';
 import { errorResponse } from './utils/errors';
+import { handleSSE } from './mcp/sse-handler';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -72,7 +73,10 @@ export default {
       let response: Response;
 
       // Routing
-      if (pathSegments[0] === 'products') {
+      // MCP SSE endpoint
+      if (pathSegments[0] === 'sse' || path === '/sse') {
+        return await handleSSE(request, productService, cartService);
+      } else if (pathSegments[0] === 'products') {
         response = await productRoutes.handleRequest(request, pathSegments.slice(1));
       } else if (pathSegments[0] === 'carts') {
         response = await cartRoutes.handleRequest(request, pathSegments.slice(1));

@@ -1,0 +1,401 @@
+/**
+ * MCP SSE Handler para Cloudflare Workers
+ * 
+ * Implementa el protocolo MCP sobre SSE para integraciones con:
+ * - Claude Desktop
+ * - Laburen Dashboard
+ * - Cualquier cliente MCP compatible
+ * 
+ * URL: https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/sse
+ */
+
+import { ProductService } from '../services/product.service';
+import { CartService } from '../services/cart.service';
+
+// Tipos MCP
+interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, { type: string; description: string }>;
+    required?: string[];
+  };
+}
+
+interface MCPToolCall {
+  jsonrpc: '2.0';
+  id: string | number;
+  method: 'tools/call';
+  params: {
+    name: string;
+    arguments: Record<string, any>;
+  };
+}
+
+interface MCPRequest {
+  jsonrpc: '2.0';
+  id: string | number;
+  method: string;
+  params?: Record<string, any>;
+}
+
+// Definición de tools disponibles
+const MCP_TOOLS: MCPTool[] = [
+  {
+    name: 'list_products',
+    description: 'Lista todos los productos disponibles en el catálogo. Opcionalmente filtra por término de búsqueda.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Término de búsqueda opcional para filtrar productos por nombre o descripción' },
+        limit: { type: 'number', description: 'Número máximo de productos a retornar (default: 20)' }
+      }
+    }
+  },
+  {
+    name: 'get_product',
+    description: 'Obtiene los detalles de un producto específico por su ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        product_id: { type: 'string', description: 'ID del producto (ej: "0001", "0042")' }
+      },
+      required: ['product_id']
+    }
+  },
+  {
+    name: 'create_cart',
+    description: 'Crea un nuevo carrito de compras vacío y retorna su ID',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'get_cart',
+    description: 'Obtiene el contenido de un carrito con todos sus items y totales',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cart_id: { type: 'string', description: 'ID del carrito (ej: "cart_abc123")' }
+      },
+      required: ['cart_id']
+    }
+  },
+  {
+    name: 'add_to_cart',
+    description: 'Agrega un producto al carrito. Si el producto ya existe, suma la cantidad.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cart_id: { type: 'string', description: 'ID del carrito' },
+        product_id: { type: 'string', description: 'ID del producto a agregar' },
+        qty: { type: 'number', description: 'Cantidad a agregar (default: 1)' }
+      },
+      required: ['cart_id', 'product_id']
+    }
+  },
+  {
+    name: 'update_cart_item',
+    description: 'Actualiza la cantidad de un item específico en el carrito',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cart_id: { type: 'string', description: 'ID del carrito' },
+        item_id: { type: 'string', description: 'ID del item en el carrito' },
+        qty: { type: 'number', description: 'Nueva cantidad (debe ser > 0)' }
+      },
+      required: ['cart_id', 'item_id', 'qty']
+    }
+  },
+  {
+    name: 'remove_from_cart',
+    description: 'Elimina un item del carrito',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cart_id: { type: 'string', description: 'ID del carrito' },
+        item_id: { type: 'string', description: 'ID del item a eliminar' }
+      },
+      required: ['cart_id', 'item_id']
+    }
+  }
+];
+
+/**
+ * Ejecuta un tool MCP y retorna el resultado
+ */
+async function executeTool(
+  toolName: string,
+  args: Record<string, any>,
+  productService: ProductService,
+  cartService: CartService
+): Promise<any> {
+  console.log(`🔧 Executing tool: ${toolName}`, args);
+
+  switch (toolName) {
+    case 'list_products': {
+      const allProducts = await productService.listProducts(args.search);
+      const limit = args.limit ?? 20;
+      const products = allProducts.slice(0, limit);
+      return { products, count: products.length, total: allProducts.length };
+    }
+
+    case 'get_product': {
+      const productId = String(args.product_id).padStart(4, '0');
+      const product = await productService.getProductById(productId);
+      return product;
+    }
+
+    case 'create_cart': {
+      const cart = await cartService.createCart();
+      return { 
+        cart_id: cart.id, 
+        message: 'Carrito creado exitosamente. IMPORTANTE: Guarda este cart_id para todas las operaciones siguientes.',
+        reminder: 'Usa este mismo cart_id para add_to_cart, get_cart, update_cart_item y remove_from_cart. NO crees otro carrito.'
+      };
+    }
+
+    case 'get_cart': {
+      const cart = await cartService.getCartWithItems(args.cart_id);
+      return {
+        ...cart,
+        cart_id: cart.id,
+        reminder: 'Este es tu carrito activo. Usa este cart_id para agregar más productos.'
+      };
+    }
+
+    case 'add_to_cart': {
+      const productId = String(args.product_id).padStart(4, '0');
+      const item = await cartService.addProductToCart(args.cart_id, productId, args.qty || 1);
+      return { 
+        cart_id: args.cart_id,
+        item, 
+        message: 'Producto agregado al carrito',
+        reminder: 'Para agregar más productos, usa el mismo cart_id: ' + args.cart_id
+      };
+    }
+
+    case 'update_cart_item': {
+      const item = await cartService.updateCartItem(args.cart_id, args.item_id, args.qty);
+      return { 
+        cart_id: args.cart_id,
+        item, 
+        message: 'Cantidad actualizada' 
+      };
+    }
+
+    case 'remove_from_cart': {
+      await cartService.removeCartItem(args.cart_id, args.item_id);
+      return { 
+        cart_id: args.cart_id,
+        message: 'Item eliminado del carrito' 
+      };
+    }
+
+    default:
+      throw new Error(`Tool desconocido: ${toolName}`);
+  }
+}
+
+/**
+ * Crea respuesta SSE para MCP
+ */
+function createSSEResponse(
+  productService: ProductService,
+  cartService: CartService,
+  request: Request
+): Response {
+  const encoder = new TextEncoder();
+  
+  // ReadableStream para SSE
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: any) => {
+        const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        controller.enqueue(encoder.encode(message));
+      };
+
+      // 1️⃣ Enviar endpoint info
+      send('endpoint', {
+        url: new URL(request.url).origin + '/sse'
+      });
+
+      // 2️⃣ Enviar server info
+      send('message', {
+        jsonrpc: '2.0',
+        method: 'notifications/initialized',
+        params: {
+          serverInfo: {
+            name: 'laburen-ai-agent-mcp',
+            version: '1.0.0'
+          },
+          capabilities: {
+            tools: {}
+          }
+        }
+      });
+
+      // 3️⃣ Enviar lista de tools
+      send('message', {
+        jsonrpc: '2.0',
+        method: 'notifications/tools/list_changed'
+      });
+
+      // Keep-alive ping cada 30 segundos
+      const pingInterval = setInterval(() => {
+        try {
+          send('ping', { timestamp: new Date().toISOString() });
+        } catch {
+          clearInterval(pingInterval);
+        }
+      }, 30000);
+
+      // Mantener conexión abierta
+      // El cliente enviará requests vía POST /sse/message
+    }
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
+  });
+}
+
+/**
+ * Handler principal para /sse
+ */
+export async function handleSSE(
+  request: Request,
+  productService: ProductService,
+  cartService: CartService
+): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  // CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }
+    });
+  }
+
+  // GET /sse - Iniciar conexión SSE
+  if (request.method === 'GET' && (path === '/sse' || path === '/sse/')) {
+    console.log('🔌 SSE Connection opened');
+    return createSSEResponse(productService, cartService, request);
+  }
+
+  // POST /sse o /sse/message - Recibir mensajes MCP
+  if (request.method === 'POST') {
+    try {
+      const body = await request.json<MCPRequest>();
+      console.log('📨 MCP Request:', body.method, body.id);
+
+      let result: any;
+
+      switch (body.method) {
+        case 'initialize':
+          result = {
+            protocolVersion: '2024-11-05',
+            serverInfo: {
+              name: 'laburen-ai-agent-mcp',
+              version: '1.0.0'
+            },
+            capabilities: {
+              tools: {}
+            }
+          };
+          break;
+
+        case 'tools/list':
+          result = { tools: MCP_TOOLS };
+          break;
+
+        case 'tools/call':
+          const { name, arguments: args } = (body as MCPToolCall).params;
+          try {
+            const toolResult = await executeTool(name, args || {}, productService, cartService);
+            result = {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(toolResult, null, 2)
+                }
+              ]
+            };
+          } catch (error: any) {
+            result = {
+              content: [
+                {
+                  type: 'text',
+                  text: `Error: ${error.message}`
+                }
+              ],
+              isError: true
+            };
+          }
+          break;
+
+        case 'ping':
+          result = {};
+          break;
+
+        default:
+          return new Response(JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id,
+            error: {
+              code: -32601,
+              message: `Method not found: ${body.method}`
+            }
+          }), {
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+      }
+
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+
+    } catch (error: any) {
+      console.error('❌ SSE Error:', error);
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        error: {
+          code: -32700,
+          message: 'Parse error'
+        }
+      }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+  }
+
+  return new Response('Method not allowed', { status: 405 });
+}

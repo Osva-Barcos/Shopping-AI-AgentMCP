@@ -49,7 +49,7 @@ npm run dev
 
 ### Production Deployment
 
-#### Deploy REST API to Cloudflare Workers
+#### Deploy to Cloudflare Workers
 
 ```bash
 # Deploy to Cloudflare Workers
@@ -58,20 +58,6 @@ npx wrangler deploy
 # Your API will be live at:
 # https://laburen-ai-agent-mcp.YOUR-SUBDOMAIN.workers.dev
 ```
-
-#### Deploy MCP HTTP Server to Railway
-
-For web dashboard integration (Laburen dashboard), deploy the MCP HTTP/SSE server:
-
-```bash
-# Build TypeScript
-npm run build
-
-# Deploy to Railway
-# See docs/DEPLOYMENT_RAILWAY.md for detailed instructions
-```
-
-**📖 Full Railway deployment guide:** [docs/DEPLOYMENT_RAILWAY.md](docs/DEPLOYMENT_RAILWAY.md)
 
 ---
 
@@ -294,24 +280,19 @@ Features:
 - ✅ CORS enabled for cross-origin requests
 - ✅ Standardized English field names
 - ✅ MCP HTTP/SSE server for web dashboard integration
-- ✅ Railway.app deployment configuration
 
 ---
 
 ## 🚀 Deployment Status
 
-### REST API Backend
+### REST API + MCP SSE Server
 **Environment:** Production  
 **Status:** ✅ Live  
 **URL:** https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev  
+**MCP SSE Endpoint:** https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/sse  
 **Database:** Cloudflare D1 (dcc0ae8b-aa76-4250-ad47-0780867c6e96)  
-**Records:** 100 products imported
-
-### MCP HTTP/SSE Server
-**Status:** Ready for deployment  
-**Platform:** Railway.app  
-**Configuration:** ✅ Procfile, railway.json, .env.example created  
-**Documentation:** [docs/DEPLOYMENT_RAILWAY.md](docs/DEPLOYMENT_RAILWAY.md)
+**Records:** 100 products imported  
+**MCP Tools:** 7 tools available (list_products, get_product, create_cart, get_cart, add_to_cart, update_cart_item, remove_from_cart)
 
 ---
 
