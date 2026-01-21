@@ -9,17 +9,31 @@ export class ProductService {
 
   /**
    * Lista todos los productos con filtro opcional de búsqueda
-   * @param search - Busca en nombre o descripción
+   * Búsqueda mejorada: divide el término en palabras y busca todas
+   * @param search - Busca en nombre o descripción (soporta múltiples palabras)
    */
   async listProducts(search?: string): Promise<Product[]> {
     if (search) {
-      const searchTerm = `%${search}%`;
+      // Dividir búsqueda en palabras para búsqueda más flexible
+      const words = search.trim().split(/\s+/).filter(w => w.length > 0);
+      
+      if (words.length === 0) {
+        return await this.db.all<Product>(
+          'SELECT * FROM products ORDER BY id ASC'
+        );
+      }
+      
+      // Construir condición WHERE que busque TODAS las palabras
+      const conditions = words.map(() => `(name LIKE ? OR description LIKE ?)`).join(' AND ');
+      const params = words.flatMap(word => [`%${word}%`, `%${word}%`]);
+      
+      console.log('🔍 Search terms:', words, 'Query:', conditions);
+      
       return await this.db.all<Product>(
         `SELECT * FROM products 
-         WHERE name LIKE ? OR description LIKE ?
+         WHERE ${conditions}
          ORDER BY id ASC`,
-        searchTerm,
-        searchTerm
+        ...params
       );
     }
 
