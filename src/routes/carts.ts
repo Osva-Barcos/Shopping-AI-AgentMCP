@@ -1,9 +1,9 @@
 // Rutas para carritos
 // POST /carts
-// GET /carts/:cart_id
-// POST /carts/:cart_id/items
-// PUT /carts/:cart_id/items/:item_id
-// DELETE /carts/:cart_id/items/:item_id
+// GET /carts/:cart_id o ?cart_id=xxx
+// POST /carts/:cart_id/items o ?cart_id=xxx&product_id=xxx&qty=n
+// PUT /carts/:cart_id/items/:item_id o ?cart_id=xxx&item_id=xxx&qty=n
+// DELETE /carts/:cart_id/items/:item_id o ?cart_id=xxx&item_id=xxx
 
 import { CartService } from '../services/cart.service';
 import { successResponse, handleError, errorResponse } from '../utils/errors';
@@ -26,27 +26,28 @@ export class CartRoutes {
   }
 
   /**
-   * GET /carts/:cart_id
+   * GET /carts/:cart_id o /carts?cart_id=xxx
    * Obtiene un carrito con todos sus items
    */
   async getCart(cartId: string, request?: Request): Promise<Response> {
     try {
-      // FALLBACK: Si cart_id viene como placeholder literal, tomarlo del query
-      if (cartId === ':cart_id' || cartId === '{cart_id}') {
-        if (request) {
-          const url = new URL(request.url);
-          const queryCartId = url.searchParams.get('cart_id');
-          if (queryCartId) {
-            cartId = queryCartId;
-          } else {
-            return errorResponse(400, 'cart_id es requerido como query param (?cart_id=xxx)', 'VALIDATION_ERROR');
-          }
-        } else {
-          return errorResponse(400, 'cart_id es requerido', 'VALIDATION_ERROR');
+      // Soportar ?cart_id como query parameter
+      if (request) {
+        const url = new URL(request.url);
+        const queryCartId = url.searchParams.get('cart_id');
+        if (queryCartId) {
+          cartId = queryCartId;
         }
       }
       
+      // Validar que tengamos un cart_id válido
+      if (!cartId || cartId === ':cart_id' || cartId === '{cart_id}' || cartId.includes('cart_id')) {
+        return errorResponse(400, 'cart_id es requerido (usa /carts/{id} o ?cart_id={id})', 'VALIDATION_ERROR');
+      }
+      
+      console.log('🛒 GET CART:', { cartId });
       const cart = await this.cartService.getCartWithItems(cartId);
+      console.log('✅ Cart retrieved:', cart.id, 'with', cart.items?.length || 0, 'items');
       return successResponse(cart);
     } catch (error) {
       return handleError(error);
@@ -54,7 +55,7 @@ export class CartRoutes {
   }
 
   /**
-   * POST /carts/:cart_id/items
+   * POST /carts/:cart_id/items o /carts/items?cart_id=xxx
    * Agrega un producto al carrito
    * Body: { product_id: string, qty?: number }
    */
@@ -64,43 +65,51 @@ export class CartRoutes {
   ): Promise<Response> {
     try {
       const body = await request.json<AddToCartRequest>().catch(() => ({} as AddToCartRequest));
+      const url = new URL(request.url);
       
-      // FALLBACK: Si cart_id viene como :cart_id literal, intentar obtenerlo del body
-      if (cartId === ':cart_id' || cartId === '{cart_id}') {
-        cartId = (body as any).cart_id;
-        if (!cartId) {
-          return errorResponse(400, 'El campo cart_id es requerido (envíalo en la URL o en el body)', 'VALIDATION_ERROR');
-        }
+      // Soportar cart_id desde query params, body o URL
+      const queryCartId = url.searchParams.get('cart_id');
+      
+      if (queryCartId) {
+        cartId = queryCartId;
+      } else if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId.includes('cart_id')) {
+        cartId = (body as any).cart_id || '';
       }
       
-      // LOG para debugging
-      console.log('[ADD_TO_CART] Received request:', {
+      if (!cartId || cartId.includes('cart_id')) {
+        return errorResponse(400, 'cart_id es requerido (URL, query param o body)', 'VALIDATION_ERROR');
+      }
+      
+      // Soportar product_id desde query params o body
+      let productId = url.searchParams.get('product_id') || body.product_id;
+      
+      console.log('🛒 ADD TO CART:', {
         cartId,
-        body: JSON.stringify(body),
-        product_id_type: typeof body.product_id,
-        product_id_value: body.product_id
+        product_id: productId,
+        qty: body.qty,
+        source: url.searchParams.get('product_id') ? 'query' : 'body'
       });
       
-      // Normalizar product_id (puede venir como número o string)
-      let productId = body.product_id;
       if (!productId) {
-        return errorResponse(400, 'El campo product_id es requerido', 'VALIDATION_ERROR');
+        return errorResponse(400, 'product_id es requerido (body o query param)', 'VALIDATION_ERROR');
       }
       
       // Convertir a string y formatear con padding si es necesario
       productId = String(productId).padStart(4, '0');
-      console.log('[ADD_TO_CART] Normalized product_id:', productId);
+      console.log('✅ Normalized product_id:', productId);
       
-      // Normalizar qty (puede venir como string o número, o vacío)
+      // Soportar qty desde query params o body
       let qty = 1;
-      if (body.qty !== undefined && body.qty !== null && body.qty !== '') {
-        qty = Number(body.qty);
+      const qtyParam = url.searchParams.get('qty') || body.qty;
+      if (qtyParam !== undefined && qtyParam !== null && qtyParam !== '') {
+        qty = Number(qtyParam);
         if (isNaN(qty) || qty <= 0) {
-          return errorResponse(400, 'El campo qty debe ser un número positivo', 'VALIDATION_ERROR');
+          return errorResponse(400, 'qty debe ser un número positivo', 'VALIDATION_ERROR');
         }
       }
 
       const item = await this.cartService.addProductToCart(cartId, productId, qty);
+      console.log('✅ Item added to cart:', item.id);
       return successResponse(item, 201);
     } catch (error) {
       return handleError(error);
@@ -108,7 +117,7 @@ export class CartRoutes {
   }
 
   /**
-   * PUT /carts/:cart_id/items/:item_id
+   * PUT /carts/:cart_id/items/:item_id o ?cart_id=xxx&item_id=xxx
    * Actualiza la cantidad de un item
    * Body: { qty: number }
    */
@@ -118,30 +127,39 @@ export class CartRoutes {
     request: Request
   ): Promise<Response> {
     try {
-      const body = await request.json<UpdateCartItemRequest>();
+      const body = await request.json<UpdateCartItemRequest>().catch(() => ({} as UpdateCartItemRequest));
+      const url = new URL(request.url);
       
-      // FALLBACK: Si vienen como placeholders, obtenerlos del body
-      if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId === '%7Bcart_id%7D') {
-        cartId = (body as any).cart_id || '';
-      }
-      if (itemId === ':item_id' || itemId === '{item_id}' || itemId === '%7Bitem_id%7D') {
-        itemId = (body as any).item_id || '';
-      }
+      // Soportar desde query params, body o URL
+      const queryCartId = url.searchParams.get('cart_id');
+      const queryItemId = url.searchParams.get('item_id');
+      const queryQty = url.searchParams.get('qty');
+      
+      if (queryCartId) cartId = queryCartId;
+      else if (cartId.includes('cart_id')) cartId = (body as any).cart_id || '';
+      
+      if (queryItemId) itemId = queryItemId;
+      else if (itemId.includes('item_id')) itemId = (body as any).item_id || '';
+      
       if (!cartId || !itemId || cartId.includes('cart_id') || itemId.includes('item_id')) {
-        return errorResponse(400, 'cart_id e item_id son requeridos en el body (ej: {"cart_id": "cart_xxx", "item_id": "item_xxx", "qty": 5})', 'VALIDATION_ERROR');
+        return errorResponse(400, 'cart_id e item_id son requeridos (URL, query params o body)', 'VALIDATION_ERROR');
       }
       
-      // Normalizar qty (puede venir como string o número)
-      if (body.qty === undefined || body.qty === null || body.qty === 0) {
-        return errorResponse(400, 'El campo qty es requerido', 'VALIDATION_ERROR');
+      console.log('🛒 UPDATE CART ITEM:', { cartId, itemId, qty: queryQty || body.qty });
+      
+      // Normalizar qty desde query o body
+      const qtyValue = queryQty || body.qty;
+      if (qtyValue === undefined || qtyValue === null || qtyValue === 0 || qtyValue === '') {
+        return errorResponse(400, 'qty es requerido', 'VALIDATION_ERROR');
       }
       
-      const qty = Number(body.qty);
+      const qty = Number(qtyValue);
       if (isNaN(qty) || qty <= 0) {
-        return errorResponse(400, 'El campo qty debe ser un número positivo', 'VALIDATION_ERROR');
+        return errorResponse(400, 'qty debe ser un número positivo', 'VALIDATION_ERROR');
       }
 
       const item = await this.cartService.updateCartItem(cartId, itemId, qty);
+      console.log('✅ Cart item updated:', item.id);
       return successResponse(item);
     } catch (error) {
       return handleError(error);
@@ -149,28 +167,28 @@ export class CartRoutes {
   }
 
   /**
-   * DELETE /carts/:cart_id/items/:item_id
+   * DELETE /carts/:cart_id/items/:item_id o ?cart_id=xxx&item_id=xxx
    * Elimina un item del carrito
    */
   async removeCartItem(cartId: string, itemId: string, request?: Request): Promise<Response> {
     try {
-      // FALLBACK: Si vienen como placeholders, obtenerlos del query
-      if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId === '%7Bcart_id%7D') {
-        if (request) {
-          const url = new URL(request.url);
-          cartId = url.searchParams.get('cart_id') || '';
-        }
+      // Soportar desde query params o URL
+      if (request) {
+        const url = new URL(request.url);
+        const queryCartId = url.searchParams.get('cart_id');
+        const queryItemId = url.searchParams.get('item_id');
+        
+        if (queryCartId) cartId = queryCartId;
+        if (queryItemId) itemId = queryItemId;
       }
-      if (itemId === ':item_id' || itemId === '{item_id}' || itemId === '%7Bitem_id%7D') {
-        if (request) {
-          const url = new URL(request.url);
-          itemId = url.searchParams.get('item_id') || '';
-        }
-      }
+      
       if (!cartId || !itemId || cartId.includes('cart_id') || itemId.includes('item_id')) {
-        return errorResponse(400, 'cart_id e item_id son requeridos como query params (?cart_id=xxx&item_id=xxx)', 'VALIDATION_ERROR');
+        return errorResponse(400, 'cart_id e item_id son requeridos (URL o query params)', 'VALIDATION_ERROR');
       }
-            await this.cartService.removeCartItem(cartId, itemId);
+      
+      console.log('🛒 REMOVE FROM CART:', { cartId, itemId });
+      await this.cartService.removeCartItem(cartId, itemId);
+      console.log('✅ Item removed from cart');
       return successResponse({ message: 'Item eliminado correctamente' });
     } catch (error) {
       return handleError(error);
@@ -190,7 +208,12 @@ export class CartRoutes {
 
     // GET /carts/:cart_id (obtener carrito)
     if (pathParts.length === 1 && method === 'GET') {
-      return this.getCart(pathParts[0]);
+      return this.getCart(pathParts[0], request);
+    }
+
+    // GET /carts?cart_id=xxx (obtener carrito por query)
+    if (pathParts.length === 0 && method === 'GET') {
+      return this.getCart('', request);
     }
 
     // POST /carts/:cart_id/items (agregar producto)
@@ -205,7 +228,7 @@ export class CartRoutes {
 
     // DELETE /carts/:cart_id/items/:item_id (eliminar item)
     if (pathParts.length === 3 && pathParts[1] === 'items' && method === 'DELETE') {
-      return this.removeCartItem(pathParts[0], pathParts[2]);
+      return this.removeCartItem(pathParts[0], pathParts[2], request);
     }
 
     return new Response('Not Found', { status: 404 });

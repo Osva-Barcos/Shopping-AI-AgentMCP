@@ -1,5 +1,7 @@
 // Rutas para productos
 // GET /products
+// GET /products?id=0001
+// GET /products?search=camisa
 // GET /products/:id
 
 import { ProductService } from '../services/product.service';
@@ -9,13 +11,22 @@ export class ProductRoutes {
   constructor(private productService: ProductService) {}
 
   /**
-   * GET /products?search=...
-   * Lista productos con filtro opcional
+   * GET /products?search=... o ?id=...
+   * Lista productos con filtro opcional o busca por ID
    */
   async listProducts(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
       const search = url.searchParams.get('search') || undefined;
+      const id = url.searchParams.get('id');
+
+      // Si viene ?id=0001, buscar ese producto específico
+      if (id) {
+        console.log('🔍 GET PRODUCT by query param:', { id });
+        const product = await this.productService.getProductById(id);
+        console.log('✅ Found product:', product?.name || 'NOT FOUND');
+        return successResponse(product);
+      }
 
       console.log('🔍 LIST PRODUCTS:', { search });
       const products = await this.productService.listProducts(search);
