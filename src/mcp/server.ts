@@ -17,8 +17,8 @@ export class LaburenMCPServer {
   private cartService: CartService;
 
   constructor(db: D1Database) {
-    this.productService = new ProductService(db);
-    this.cartService = new CartService(db, this.productService);
+    this.productService = new ProductService(db as any);
+    this.cartService = new CartService(db as any, this.productService);
 
     // Crear servidor MCP
     this.server = new Server(
@@ -157,7 +157,8 @@ export class LaburenMCPServer {
       try {
         switch (name) {
           case 'list_products': {
-            const products = await this.productService.listProducts();
+            const typedArgs = args as { page?: number; limit?: number; search?: string; category?: string; min_price?: number; max_price?: number } | undefined;
+            const products = await this.productService.listProducts(typedArgs?.search);
             return {
               content: [
                 {
@@ -169,7 +170,8 @@ export class LaburenMCPServer {
           }
 
           case 'get_product': {
-            const product = await this.productService.getProductById(args.product_id);
+            const typedArgs = args as { product_id: string };
+            const product = await this.productService.getProductById(typedArgs.product_id);
             return {
               content: [
                 {
@@ -193,16 +195,17 @@ export class LaburenMCPServer {
           }
 
           case 'add_to_cart': {
+            const typedArgs = args as { cart_id: string; product_id: string | number; qty: number | string };
             // Normalizar product_id y qty
-            let productId = String(args.product_id).padStart(4, '0');
-            let qty = Number(args.qty);
+            let productId = String(typedArgs.product_id).padStart(4, '0');
+            let qty = Number(typedArgs.qty);
             
             if (isNaN(qty) || qty <= 0) {
               throw new Error('qty debe ser un número positivo');
             }
 
             const item = await this.cartService.addProductToCart(
-              args.cart_id,
+              typedArgs.cart_id,
               productId,
               qty
             );
@@ -217,7 +220,8 @@ export class LaburenMCPServer {
           }
 
           case 'get_cart': {
-            const cart = await this.cartService.getCartWithItems(args.cart_id);
+            const typedArgs = args as { cart_id: string };
+            const cart = await this.cartService.getCartWithItems(typedArgs.cart_id);
             return {
               content: [
                 {
@@ -229,14 +233,15 @@ export class LaburenMCPServer {
           }
 
           case 'update_cart_item': {
-            const qty = Number(args.qty);
+            const typedArgs = args as { cart_id: string; item_id: string; qty: number | string };
+            const qty = Number(typedArgs.qty);
             if (isNaN(qty) || qty <= 0) {
               throw new Error('qty debe ser un número positivo');
             }
 
             const item = await this.cartService.updateCartItem(
-              args.cart_id,
-              args.item_id,
+              typedArgs.cart_id,
+              typedArgs.item_id,
               qty
             );
             return {
@@ -250,7 +255,8 @@ export class LaburenMCPServer {
           }
 
           case 'remove_cart_item': {
-            await this.cartService.removeItemFromCart(args.cart_id, args.item_id);
+            const typedArgs = args as { cart_id: string; item_id: string };
+            await this.cartService.removeCartItem(typedArgs.cart_id, typedArgs.item_id);
             return {
               content: [
                 {

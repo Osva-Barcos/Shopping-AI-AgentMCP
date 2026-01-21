@@ -5,9 +5,9 @@
 // PUT /carts/:cart_id/items/:item_id
 // DELETE /carts/:cart_id/items/:item_id
 
-import { CartService } from '../services/cart.service';
-import { successResponse, handleError, errorResponse } from '../utils/errors';
-import { AddToCartRequest, UpdateCartItemRequest } from '../types';
+import { CartService } from '../services/cart.service.js';
+import { successResponse, handleError, errorResponse } from '../utils/errors.js';
+import { AddToCartRequest, UpdateCartItemRequest } from '../types/index.js';
 
 export class CartRoutes {
   constructor(private cartService: CartService) {}
@@ -63,7 +63,7 @@ export class CartRoutes {
     request: Request
   ): Promise<Response> {
     try {
-      const body = await request.json<AddToCartRequest>().catch(() => ({}));
+      const body = await request.json().catch(() => ({})) as AddToCartRequest;
       
       // FALLBACK: Si cart_id viene como :cart_id literal, intentar obtenerlo del body
       if (cartId === ':cart_id' || cartId === '{cart_id}') {
@@ -93,7 +93,7 @@ export class CartRoutes {
       
       // Normalizar qty (puede venir como string o número, o vacío)
       let qty = 1;
-      if (body.qty !== undefined && body.qty !== null && body.qty !== '') {
+      if (body.qty !== undefined && body.qty !== null && String(body.qty) !== '') {
         qty = Number(body.qty);
         if (isNaN(qty) || qty <= 0) {
           return errorResponse(400, 'El campo qty debe ser un número positivo', 'VALIDATION_ERROR');
@@ -118,7 +118,7 @@ export class CartRoutes {
     request: Request
   ): Promise<Response> {
     try {
-      const body = await request.json<UpdateCartItemRequest>();
+      const body = await request.json().catch(() => ({})) as UpdateCartItemRequest;
       
       // FALLBACK: Si vienen como placeholders, obtenerlos del body
       if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId === '%7Bcart_id%7D') {
@@ -132,7 +132,7 @@ export class CartRoutes {
       }
       
       // Normalizar qty (puede venir como string o número)
-      if (body.qty === undefined || body.qty === null || body.qty === '') {
+      if (body.qty === undefined || body.qty === null || String(body.qty) === '') {
         return errorResponse(400, 'El campo qty es requerido', 'VALIDATION_ERROR');
       }
       

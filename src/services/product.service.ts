@@ -1,8 +1,8 @@
 // Servicio de productos
 // Lógica de negocio para productos
 
-import { DbClient } from '../db/client';
-import { Product, NotFoundError } from '../types';
+import { DbClient } from '../db/client.js';
+import { Product, NotFoundError } from '../types/index.js';
 
 export class ProductService {
   constructor(private db: DbClient) {}

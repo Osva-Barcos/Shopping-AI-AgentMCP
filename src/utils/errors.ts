@@ -1,6 +1,6 @@
 // Utilidades para manejo de errores HTTP
 
-import { AppError, ApiResponse } from '../types';
+import { AppError, ApiResponse } from '../types/index.js';
 
 /**
  * Crea una respuesta JSON exitosa

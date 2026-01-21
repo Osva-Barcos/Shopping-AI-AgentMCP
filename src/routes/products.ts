@@ -2,8 +2,8 @@
 // GET /products
 // GET /products/:id
 
-import { ProductService } from '../services/product.service';
-import { successResponse, handleError } from '../utils/errors';
+import { ProductService } from '../services/product.service.js';
+import { successResponse, handleError } from '../utils/errors.js';
 
 export class ProductRoutes {
   constructor(private productService: ProductService) {}

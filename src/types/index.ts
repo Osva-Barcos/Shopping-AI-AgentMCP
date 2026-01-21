@@ -45,11 +45,12 @@ export interface CartItemDetail extends CartItem {
 // ===== Request Bodies =====
 
 export interface AddToCartRequest {
-  qty?: number; // Por defecto 1
+  product_id?: string | number;
+  qty?: number | string; // Por defecto 1
 }
 
 export interface UpdateCartItemRequest {
-  qty: number;
+  qty: number | string;
 }
 
 // ===== Errores =====

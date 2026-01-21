@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "MCP HTTP backend para Agente de IA conversacional - Cloudflare Workers",
   "main": "src/index.ts",
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "mcp": "node --loader ts-node/esm src/mcp/index.ts",
+    "build": "tsc",
+    "mcp": "node dist/mcp/index.js",
     "db:create": "wrangler d1 create laburen-ai-db",
     "db:migrate": "wrangler d1 execute laburen-ai-db --file=./src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute laburen-ai-db --local --file=./src/db/schema.sql",

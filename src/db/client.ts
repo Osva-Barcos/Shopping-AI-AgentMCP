@@ -1,7 +1,7 @@
 // Cliente de base de datos D1
 // Wrapper simple para facilitar queries
 
-import { Env } from '../types';
+import { Env } from '../types/index.js';
 
 export class DbClient {
   constructor(private db: D1Database) {}

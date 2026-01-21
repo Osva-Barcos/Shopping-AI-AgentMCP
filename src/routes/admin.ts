@@ -2,8 +2,8 @@
 // GET /admin - Panel HTML para ver productos
 // GET /admin/products - API para listar productos
 
-import { ProductService } from '../services/product.service';
-import { successResponse, handleError } from '../utils/errors';
+import { ProductService } from '../services/product.service.js';
+import { successResponse, handleError } from '../utils/errors.js';
 
 export class AdminRoutes {
   constructor(private productService: ProductService) {}

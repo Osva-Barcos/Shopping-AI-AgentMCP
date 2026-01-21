@@ -1,8 +1,8 @@
 // Servicio de carritos
 // Lógica de negocio para carritos de compra
 
-import { DbClient } from '../db/client';
-import { ProductService } from './product.service';
+import { DbClient } from '../db/client.js';
+import { ProductService } from './product.service.js';
 import {
   Cart,
   CartItem,
@@ -11,8 +11,8 @@ import {
   NotFoundError,
   ValidationError,
   ConflictError
-} from '../types';
-import { generateId } from '../utils/errors';
+} from '../types/index.js';
+import { generateId } from '../utils/errors.js';
 
 export class CartService {
   constructor(
