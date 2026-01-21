@@ -46,6 +46,21 @@ export class ApiClient {
   // Products
   async listProducts(search?: string) {
     const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    const products = await this.request(`/products${params}`);
+    return Array.isArray(products) ? products.map(p => this.formatProduct(p)) : products;
+  }
+
+  async getProduct(productId: string) {
+    const product = await this.request(`/products/${productId}`);
+    return this.formatProduct(product);
+  }
+
+  // Carts
+  async createCart() {
+    return this.request('/carts', { method: 'POST' });
+  }
+
+  async getCart(cartId: string) {
     const cart = await this.request(`/carts/${cartId}`);
     // Formatear precios en el carrito
     if (cart.items) {
@@ -84,22 +99,7 @@ export class ApiClient {
       item.product = this.formatProduct(item.product);
       item.subtotal_display = this.formatPrice(item.subtotal);
     }
-    return itemc getCart(cartId: string) {
-    return this.request(`/carts/${cartId}`);
-  }
-
-  async addToCart(cartId: string, productId: string, qty: number) {
-    return this.request(`/carts/${cartId}/items`, {
-      method: 'POST',
-      body: JSON.stringify({ product_id: productId, qty }),
-    });
-  }
-
-  async updateCartItem(cartId: string, itemId: string, qty: number) {
-    return this.request(`/carts/${cartId}/items/${itemId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ qty }),
-    });
+    return item;
   }
 
   async removeCartItem(cartId: string, itemId: string) {

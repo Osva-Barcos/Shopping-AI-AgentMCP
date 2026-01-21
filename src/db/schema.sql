@@ -31,3 +31,5 @@ CREATE TABLE IF NOT EXISTS cart_items (
 -- Índices para mejorar consultas
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);
 CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON cart_items(product_id);
+-- Índice compuesto para búsquedas de items por carrito y producto
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart_product ON cart_items(cart_id, product_id);

@@ -59,16 +59,31 @@ export class CartService {
 
   /**
    * Obtiene un carrito completo con sus items y productos
+   * Optimizado con un solo JOIN en lugar de múltiples queries
    */
   async getCartWithItems(cartId: string): Promise<CartWithItems> {
     const cart = await this.getCartById(cartId);
 
-    const items = await this.db.all<CartItem>(
-      'SELECT * FROM cart_items WHERE cart_id = ?',
+    // Query optimizada con JOIN - una sola consulta
+    const itemsWithProducts = await this.db.all<any>(
+      `SELECT 
+        ci.id,
+        ci.cart_id,
+        ci.product_id,
+        ci.qty,
+        p.id as p_id,
+        p.name as p_name,
+        p.description as p_description,
+        p.price as p_price,
+        p.stock as p_stock,
+        p.available as p_available
+      FROM cart_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      WHERE ci.cart_id = ?`,
       cartId
     );
 
-    if (items.length === 0) {
+    if (itemsWithProducts.length === 0) {
       return {
         ...cart,
         items: [],
@@ -76,20 +91,22 @@ export class CartService {
       };
     }
 
-    // Obtener los productos de los items
-    const productIds = items.map(item => item.product_id);
-    const products = await this.productService.getProductsByIds(productIds);
-    const productMap = new Map(products.map(p => [p.id, p]));
-
-    // Construir los items con detalle
-    const itemsWithDetail: CartItemDetail[] = items.map(item => {
-      const product = productMap.get(item.product_id)!;
-      return {
-        ...item,
-        product,
-        subtotal: product.price * item.qty
-      };
-    });
+    // Mapear los resultados
+    const itemsWithDetail: CartItemDetail[] = itemsWithProducts.map(row => ({
+      id: row.id,
+      cart_id: row.cart_id,
+      product_id: row.product_id,
+      qty: row.qty,
+      product: {
+        id: row.p_id,
+        name: row.p_name,
+        description: row.p_description,
+        price: row.p_price,
+        stock: row.p_stock,
+        available: row.p_available
+      },
+      subtotal: row.p_price * row.qty
+    }));
 
     const total = itemsWithDetail.reduce((sum, item) => sum + item.subtotal, 0);
 
@@ -102,6 +119,7 @@ export class CartService {
 
   /**
    * Agrega un producto al carrito
+   * Optimizado: valida y ejecuta en menos queries
    */
   async addProductToCart(
     cartId: string,
@@ -113,47 +131,41 @@ export class CartService {
       throw new ValidationError('La cantidad debe ser mayor a 0');
     }
 
-    await this.getCartById(cartId); // Valida que existe el carrito
-    const product = await this.productService.getProductById(productId);
+    // Query combinada: valida carrito, producto y item existente en paralelo
+    const [cart, product, existingItem] = await Promise.all([
+      this.getCartById(cartId),
+      this.productService.getProductById(productId),
+      this.db.get<CartItem>(
+        'SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?',
+        cartId,
+        productId
+      )
+    ]);
 
-    // Validar que el producto esté marcado como disponible
+    // Validar disponibilidad
     if (product.available === 'No') {
       throw new ConflictError(
         `Product not available. "${product.name}" is not available for sale.`
       );
     }
 
-    // Validar que el producto tenga stock
+    // Validar stock
     if (product.stock === 0) {
       throw new ConflictError(
         `Producto sin stock. "${product.name}" no tiene unidades disponibles.`
       );
     }
 
-    // Validar stock suficiente
-    if (product.stock < qty) {
+    const requiredQty = existingItem ? existingItem.qty + qty : qty;
+    if (product.stock < requiredQty) {
       throw new ConflictError(
-        `Stock insuficiente. Disponible: ${product.stock}, solicitado: ${qty}`
+        `Stock insuficiente. Disponible: ${product.stock}, solicitado: ${requiredQty}`
       );
     }
 
-    // Verificar si el producto ya está en el carrito
-    const existingItem = await this.db.get<CartItem>(
-      'SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?',
-      cartId,
-      productId
-    );
-
     if (existingItem) {
-      // Actualizar cantidad
+      // Actualizar cantidad existente
       const newQty = existingItem.qty + qty;
-      
-      if (product.stock < newQty) {
-        throw new ConflictError(
-          `Stock insuficiente. Disponible: ${product.stock}, en carrito: ${existingItem.qty}, solicitado: ${qty}`
-        );
-      }
-
       await this.db.run(
         'UPDATE cart_items SET qty = ? WHERE id = ?',
         newQty,
@@ -195,18 +207,26 @@ export class CartService {
     cartId: string,
     itemId: string,
     qty: number
+  ): Optimizado: queries en paralelo
+   */
+  async updateCartItem(
+    cartId: string,
+    itemId: string,
+    qty: number
   ): Promise<CartItem> {
     if (qty <= 0) {
       throw new ValidationError('La cantidad debe ser mayor a 0');
     }
 
-    await this.getCartById(cartId); // Valida que existe el carrito
-
-    const item = await this.db.get<CartItem>(
-      'SELECT * FROM cart_items WHERE id = ? AND cart_id = ?',
-      itemId,
-      cartId
-    );
+    // Queries en paralelo
+    const [cart, item] = await Promise.all([
+      this.getCartById(cartId),
+      this.db.get<CartItem>(
+        'SELECT * FROM cart_items WHERE id = ? AND cart_id = ?',
+        itemId,
+        cartId
+      )
+    ]);
 
     if (!item) {
       throw new NotFoundError(`Item con ID ${itemId} no encontrado en el carrito`);
@@ -220,18 +240,11 @@ export class CartService {
       );
     }
 
-    await this.db.run(
-      'UPDATE cart_items SET qty = ? WHERE id = ?',
-      qty,
-      itemId
-    );
-
-    await this.updateCartTimestamp(cartId);
-
-    return {
-      ...item,
-      qty
-    };
+    // Actualizar en paralelo
+    await Promise.all([
+      this.db.run('UPDATE cart_items SET qty = ? WHERE id = ?', qty, itemId),
+      this.updateCartTimestamp(cartId)
+    ]
   }
 
   /**
