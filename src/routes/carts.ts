@@ -63,7 +63,7 @@ export class CartRoutes {
     request: Request
   ): Promise<Response> {
     try {
-      const body = await request.json<AddToCartRequest>().catch(() => ({}));
+      const body = await request.json<AddToCartRequest>().catch(() => ({} as AddToCartRequest));
       
       // FALLBACK: Si cart_id viene como :cart_id literal, intentar obtenerlo del body
       if (cartId === ':cart_id' || cartId === '{cart_id}') {
@@ -132,7 +132,7 @@ export class CartRoutes {
       }
       
       // Normalizar qty (puede venir como string o número)
-      if (body.qty === undefined || body.qty === null || body.qty === '') {
+      if (body.qty === undefined || body.qty === null || body.qty === 0) {
         return errorResponse(400, 'El campo qty es requerido', 'VALIDATION_ERROR');
       }
       

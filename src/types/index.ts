@@ -45,7 +45,9 @@ export interface CartItemDetail extends CartItem {
 // ===== Request Bodies =====
 
 export interface AddToCartRequest {
-  qty?: number; // Por defecto 1
+  product_id: string | number; // ID del producto
+  qty?: number | string; // Por defecto 1, puede venir como string desde MCP
+  cart_id?: string; // Fallback si viene en el body
 }
 
 export interface UpdateCartItemRequest {
