@@ -41,6 +41,15 @@ export default {
       const url = new URL(request.url);
       const path = url.pathname;
 
+      // LOG: Request entrante
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📥 REQUEST:', {
+        method: request.method,
+        url: request.url,
+        path: path,
+        timestamp: new Date().toISOString()
+      });
+
       // Inicializar servicios
       const dbClient = createDbClient(env);
       const productService = new ProductService(dbClient);
@@ -72,6 +81,8 @@ export default {
       let response: Response;
 
       // Routing
+      console.log('🔀 ROUTING:', { segment: pathSegments[0], pathParts: pathSegments.slice(1) });
+      
       if (pathSegments[0] === 'products') {
         response = await productRoutes.handleRequest(request, pathSegments.slice(1));
       } else if (pathSegments[0] === 'carts') {
@@ -81,6 +92,15 @@ export default {
       } else {
         response = errorResponse(404, 'Ruta no encontrada', 'NOT_FOUND');
       }
+
+      // LOG: Response saliente
+      const responseBody = await response.clone().text();
+      console.log('📤 RESPONSE:', {
+        status: response.status,
+        body: responseBody.substring(0, 500) + (responseBody.length > 500 ? '...' : ''),
+        timestamp: new Date().toISOString()
+      });
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Agregar headers CORS a la respuesta
       const headers = new Headers(response.headers);

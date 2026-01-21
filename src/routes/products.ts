@@ -17,7 +17,9 @@ export class ProductRoutes {
       const url = new URL(request.url);
       const search = url.searchParams.get('search') || undefined;
 
+      console.log('🔍 LIST PRODUCTS:', { search });
       const products = await this.productService.listProducts(search);
+      console.log('✅ Found products:', products.length);
       return successResponse(products);
     } catch (error) {
       return handleError(error);
@@ -30,7 +32,9 @@ export class ProductRoutes {
    */
   async getProduct(productId: string): Promise<Response> {
     try {
+      console.log('🔍 GET PRODUCT:', { productId });
       const product = await this.productService.getProductById(productId);
+      console.log('✅ Found product:', product?.name || 'NOT FOUND');
       return successResponse(product);
     } catch (error) {
       return handleError(error);
