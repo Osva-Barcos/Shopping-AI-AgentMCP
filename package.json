@@ -6,18 +6,31 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "mcp": "node --loader ts-node/esm src/mcp/index.ts",
     "db:create": "wrangler d1 create laburen-ai-db",
     "db:migrate": "wrangler d1 execute laburen-ai-db --file=./src/db/schema.sql",
     "db:migrate:local": "wrangler d1 execute laburen-ai-db --local --file=./src/db/schema.sql",
     "db:query": "wrangler d1 execute laburen-ai-db --command",
     "tail": "wrangler tail"
   },
-  "keywords": ["mcp", "cloudflare", "workers", "ai", "agent", "laburen"],
+  "keywords": [
+    "mcp",
+    "cloudflare",
+    "workers",
+    "ai",
+    "agent",
+    "laburen"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240129.0",
+    "@types/node": "^25.0.9",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "wrangler": "^3.25.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3"
   }
 }

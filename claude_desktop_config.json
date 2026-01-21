@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "laburen-shop": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\osval\\OneDrive\\Documentos\\GitHub\\laburen-ai-agent-mcp\\dist\\mcp\\index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
