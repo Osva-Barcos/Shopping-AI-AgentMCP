@@ -32,8 +32,8 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  // Endpoint POST para recibir mensajes MCP
-  if (req.url === '/sse' && req.method === 'POST') {
+  // Endpoint POST para recibir mensajes MCP (con sessionId)
+  if (req.url?.startsWith('/message') && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => {
       body += chunk.toString();
@@ -42,19 +42,23 @@ const httpServer = createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const message = JSON.parse(body);
-        console.log('📨 Mensaje POST recibido:', message);
+        console.log('📨 Mensaje POST recibido en /message:', message);
         
-        // Procesar el mensaje y devolver respuesta
+        // El SSEServerTransport maneja estos mensajes automáticamente
+        // Solo confirmamos recepción
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           jsonrpc: '2.0',
           id: message.id || 1,
-          result: { status: 'received' }
+          result: { status: 'message received' }
         }));
       } catch (error) {
         console.error('Error procesando mensaje:', error);
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        res.end(JSON.stringify({ 
+          jsonrpc: '2.0',
+          error: { code: -32700, message: 'Parse error' }
+        }));
       }
     });
     return;
