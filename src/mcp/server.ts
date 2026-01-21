@@ -4,21 +4,18 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ProductService } from '../services/product.service.js';
-import { CartService } from '../services/cart.service.js';
-import type { D1Database } from '@cloudflare/workers-types';
+import { ApiClient } from './api-client.js';
 
 /**
  * MCP Server para el sistema de carrito de compras
+ * Usa la API REST desplegada en Cloudflare Workers
  */
 export class LaburenMCPServer {
   private server: Server;
-  private productService: ProductService;
-  private cartService: CartService;
+  private apiClient: ApiClient;
 
-  constructor(db: D1Database) {
-    this.productService = new ProductService(db as any);
-    this.cartService = new CartService(db as any, this.productService);
+  constructor(apiBaseUrl?: string) {
+    this.apiClient = new ApiClient(apiBaseUrl);
 
     // Crear servidor MCP
     this.server = new Server(
@@ -157,8 +154,8 @@ export class LaburenMCPServer {
       try {
         switch (name) {
           case 'list_products': {
-            const typedArgs = args as { page?: number; limit?: number; search?: string; category?: string; min_price?: number; max_price?: number } | undefined;
-            const products = await this.productService.listProducts(typedArgs?.search);
+            const typedArgs = args as { search?: string } | undefined;
+            const products = await this.apiClient.listProducts(typedArgs?.search);
             return {
               content: [
                 {
@@ -171,7 +168,7 @@ export class LaburenMCPServer {
 
           case 'get_product': {
             const typedArgs = args as { product_id: string };
-            const product = await this.productService.getProductById(typedArgs.product_id);
+            const product = await this.apiClient.getProduct(typedArgs.product_id);
             return {
               content: [
                 {
@@ -183,7 +180,7 @@ export class LaburenMCPServer {
           }
 
           case 'create_cart': {
-            const cart = await this.cartService.createCart();
+            const cart = await this.apiClient.createCart();
             return {
               content: [
                 {
@@ -204,7 +201,7 @@ export class LaburenMCPServer {
               throw new Error('qty debe ser un número positivo');
             }
 
-            const item = await this.cartService.addProductToCart(
+            const item = await this.apiClient.addToCart(
               typedArgs.cart_id,
               productId,
               qty
@@ -221,7 +218,7 @@ export class LaburenMCPServer {
 
           case 'get_cart': {
             const typedArgs = args as { cart_id: string };
-            const cart = await this.cartService.getCartWithItems(typedArgs.cart_id);
+            const cart = await this.apiClient.getCart(typedArgs.cart_id);
             return {
               content: [
                 {
@@ -239,7 +236,7 @@ export class LaburenMCPServer {
               throw new Error('qty debe ser un número positivo');
             }
 
-            const item = await this.cartService.updateCartItem(
+            const item = await this.apiClient.updateCartItem(
               typedArgs.cart_id,
               typedArgs.item_id,
               qty
@@ -256,7 +253,7 @@ export class LaburenMCPServer {
 
           case 'remove_cart_item': {
             const typedArgs = args as { cart_id: string; item_id: string };
-            await this.cartService.removeCartItem(typedArgs.cart_id, typedArgs.item_id);
+            await this.apiClient.removeCartItem(typedArgs.cart_id, typedArgs.item_id);
             return {
               content: [
                 {
