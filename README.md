@@ -24,11 +24,12 @@ Built for integration with AI conversational platforms like Chatwoot.
 
 ## 🏗️ Tech Stack
 
-- **Runtime:** Cloudflare Workers (serverless)
+- **Runtime:** Cloudflare Workers (serverless) + Node.js (MCP HTTP Server)
 - **Language:** TypeScript (strict mode)
 - **Database:** Cloudflare D1 (SQLite)
-- **API Style:** REST HTTP
+- **API Style:** REST HTTP + MCP over SSE
 - **Architecture:** Layered (Routes → Services → DB Client)
+- **MCP Integration:** HTTP/SSE server for web dashboards
 
 ---
 
@@ -48,6 +49,8 @@ npm run dev
 
 ### Production Deployment
 
+#### Deploy REST API to Cloudflare Workers
+
 ```bash
 # Deploy to Cloudflare Workers
 npx wrangler deploy
@@ -55,6 +58,20 @@ npx wrangler deploy
 # Your API will be live at:
 # https://laburen-ai-agent-mcp.YOUR-SUBDOMAIN.workers.dev
 ```
+
+#### Deploy MCP HTTP Server to Railway
+
+For web dashboard integration (Laburen dashboard), deploy the MCP HTTP/SSE server:
+
+```bash
+# Build TypeScript
+npm run build
+
+# Deploy to Railway
+# See docs/DEPLOYMENT_RAILWAY.md for detailed instructions
+```
+
+**📖 Full Railway deployment guide:** [docs/DEPLOYMENT_RAILWAY.md](docs/DEPLOYMENT_RAILWAY.md)
 
 ---
 
@@ -276,16 +293,25 @@ Features:
 - ✅ Production deployment on Cloudflare Workers
 - ✅ CORS enabled for cross-origin requests
 - ✅ Standardized English field names
+- ✅ MCP HTTP/SSE server for web dashboard integration
+- ✅ Railway.app deployment configuration
 
 ---
 
 ## 🚀 Deployment Status
 
+### REST API Backend
 **Environment:** Production  
 **Status:** ✅ Live  
 **URL:** https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev  
 **Database:** Cloudflare D1 (dcc0ae8b-aa76-4250-ad47-0780867c6e96)  
 **Records:** 100 products imported
+
+### MCP HTTP/SSE Server
+**Status:** Ready for deployment  
+**Platform:** Railway.app  
+**Configuration:** ✅ Procfile, railway.json, .env.example created  
+**Documentation:** [docs/DEPLOYMENT_RAILWAY.md](docs/DEPLOYMENT_RAILWAY.md)
 
 ---
 
