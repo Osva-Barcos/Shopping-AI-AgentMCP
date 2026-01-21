@@ -29,11 +29,21 @@ export class CartRoutes {
    * GET /carts/:cart_id
    * Obtiene un carrito con todos sus items
    */
-  async getCart(cartId: string): Promise<Response> {
+  async getCart(cartId: string, request?: Request): Promise<Response> {
     try {
-      // FALLBACK: Si cart_id viene como placeholder literal
+      // FALLBACK: Si cart_id viene como placeholder literal, tomarlo del query
       if (cartId === ':cart_id' || cartId === '{cart_id}') {
-        return errorResponse(400, 'Cart ID is required. Laburen debe enviar el cart_id real en la URL', 'VALIDATION_ERROR');
+        if (request) {
+          const url = new URL(request.url);
+          const queryCartId = url.searchParams.get('cart_id');
+          if (queryCartId) {
+            cartId = queryCartId;
+          } else {
+            return errorResponse(400, 'cart_id es requerido como query param (?cart_id=xxx)', 'VALIDATION_ERROR');
+          }
+        } else {
+          return errorResponse(400, 'cart_id es requerido', 'VALIDATION_ERROR');
+        }
       }
       
       const cart = await this.cartService.getCartWithItems(cartId);
@@ -111,14 +121,14 @@ export class CartRoutes {
       const body = await request.json<UpdateCartItemRequest>();
       
       // FALLBACK: Si vienen como placeholders, obtenerlos del body
-      if (cartId === ':cart_id' || cartId === '{cart_id}') {
+      if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId === '%7Bcart_id%7D') {
         cartId = (body as any).cart_id || '';
       }
-      if (itemId === ':item_id' || itemId === '{item_id}') {
+      if (itemId === ':item_id' || itemId === '{item_id}' || itemId === '%7Bitem_id%7D') {
         itemId = (body as any).item_id || '';
       }
-      if (!cartId || !itemId) {
-        return errorResponse(400, 'cart_id e item_id son requeridos (envíalos en el body)', 'VALIDATION_ERROR');
+      if (!cartId || !itemId || cartId.includes('cart_id') || itemId.includes('item_id')) {
+        return errorResponse(400, 'cart_id e item_id son requeridos en el body (ej: {"cart_id": "cart_xxx", "item_id": "item_xxx", "qty": 5})', 'VALIDATION_ERROR');
       }
       
       // Normalizar qty (puede venir como string o número)
@@ -142,13 +152,23 @@ export class CartRoutes {
    * DELETE /carts/:cart_id/items/:item_id
    * Elimina un item del carrito
    */
-  async removeCartItem(cartId: string, itemId: string): Promise<Response> {
-    try {      // FALLBACK: Si vienen como placeholders
-      if (cartId === ':cart_id' || cartId === '{cart_id}') {
-        return errorResponse(400, 'cart_id es requerido', 'VALIDATION_ERROR');
+  async removeCartItem(cartId: string, itemId: string, request?: Request): Promise<Response> {
+    try {
+      // FALLBACK: Si vienen como placeholders, obtenerlos del query
+      if (cartId === ':cart_id' || cartId === '{cart_id}' || cartId === '%7Bcart_id%7D') {
+        if (request) {
+          const url = new URL(request.url);
+          cartId = url.searchParams.get('cart_id') || '';
+        }
       }
-      if (itemId === ':item_id' || itemId === '{item_id}') {
-        return errorResponse(400, 'item_id es requerido', 'VALIDATION_ERROR');
+      if (itemId === ':item_id' || itemId === '{item_id}' || itemId === '%7Bitem_id%7D') {
+        if (request) {
+          const url = new URL(request.url);
+          itemId = url.searchParams.get('item_id') || '';
+        }
+      }
+      if (!cartId || !itemId || cartId.includes('cart_id') || itemId.includes('item_id')) {
+        return errorResponse(400, 'cart_id e item_id son requeridos como query params (?cart_id=xxx&item_id=xxx)', 'VALIDATION_ERROR');
       }
             await this.cartService.removeCartItem(cartId, itemId);
       return successResponse({ message: 'Item eliminado correctamente' });
