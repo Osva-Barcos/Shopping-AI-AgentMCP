@@ -202,12 +202,7 @@ export class CartService {
 
   /**
    * Actualiza la cantidad de un item en el carrito
-   */
-  async updateCartItem(
-    cartId: string,
-    itemId: string,
-    qty: number
-  ): Optimizado: queries en paralelo
+   * Optimizado: queries en paralelo
    */
   async updateCartItem(
     cartId: string,
@@ -244,7 +239,12 @@ export class CartService {
     await Promise.all([
       this.db.run('UPDATE cart_items SET qty = ? WHERE id = ?', qty, itemId),
       this.updateCartTimestamp(cartId)
-    ]
+    ]);
+
+    return {
+      ...item,
+      qty
+    };
   }
 
   /**
