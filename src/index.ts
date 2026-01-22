@@ -71,7 +71,7 @@ export default {
               diagnostics: '/diagnostics'
             },
             config: {
-              sse_keepalive_interval: '10 seconds',
+              sse_keepalive_interval: '5 seconds',
               cors_enabled: true
             }
           }),

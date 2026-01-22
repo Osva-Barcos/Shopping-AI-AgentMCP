@@ -296,14 +296,17 @@ This prompt includes:
 If your agent works in the Laburen dashboard but **stops responding after the first message** in Chatwoot/WhatsApp:
 
 **Quick Fix:**
-1. Use the **REST endpoint** instead of SSE:
+1. Deploy latest changes with **ultra-aggressive SSE keep-alive** (30s → 5s)
    ```
-   https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/api/tools/call
+   npm run deploy
    ```
    
-2. Verify user has `organizationId` assigned
+2. Verify MCP URL uses SSE endpoint:
+   ```
+   https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/sse
+   ```
 
-3. Deploy latest changes with improved keep-alive (10s)
+3. Verify user has `organizationId` assigned in database
 
 **📄 Full Guide:** [docs/QUICK_FIX_CHATWOOT.md](docs/QUICK_FIX_CHATWOOT.md)
 
@@ -313,10 +316,10 @@ If your agent works in the Laburen dashboard but **stops responding after the fi
 
 | Issue | Solution |
 |-------|----------|
-| Agent doesn't respond to second message | Use REST endpoint (`/api/tools/call`) instead of SSE |
+| Agent doesn't respond to second message | Deploy with ultra-aggressive keep-alive (5s) and verify SSE endpoint |
 | "Missing organizationId" error | Assign organization to user in database |
-| SSE connection timeout | Keep-alive reduced to 10s (redeploy needed) |
-| Tools not found | Verify MCP URL is correct in config |
+| SSE connection timeout | Keep-alive improved: 30s → 10s → **5s** (deploy latest code) |
+| Tools not found | Verify MCP URL: `.../sse` (not `/api/tools/call`) |
 
 ### Testing
 

@@ -138,43 +138,76 @@ async function executeTool(
   switch (toolName) {
     case 'list_products': {
       const allProducts = await productService.listProducts(args.search);
-      const limit = args.limit ?? 20;
+      const limit = args.limit ?? 10; // Reducido de 20 a 10
       const products = allProducts.slice(0, limit);
-      return { products, count: products.length, total: allProducts.length };
+      // Simplificar cada producto - solo campos esenciales
+      const simplifiedProducts = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        stock: p.stock,
+        available: p.available
+      }));
+      return { 
+        products: simplifiedProducts, 
+        count: simplifiedProducts.length, 
+        total: allProducts.length 
+      };
     }
 
     case 'get_product': {
       const productId = String(args.product_id).padStart(4, '0');
       const product = await productService.getProductById(productId);
-      return product;
+      // Solo campos esenciales
+      return {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        stock: product.stock,
+        available: product.available
+      };
     }
 
     case 'create_cart': {
       const cart = await cartService.createCart();
+      // Payload simplificado - solo lo esencial
       return { 
-        cart_id: cart.id, 
-        message: 'Carrito creado exitosamente. IMPORTANTE: Guarda este cart_id para todas las operaciones siguientes.',
-        reminder: 'Usa este mismo cart_id para add_to_cart, get_cart, update_cart_item y remove_from_cart. NO crees otro carrito.'
+        cart_id: cart.id,
+        status: 'created',
+        message: 'Carrito creado. Usa este cart_id para agregar productos.'
       };
     }
 
     case 'get_cart': {
       const cart = await cartService.getCartWithItems(args.cart_id);
+      // Simplificar items - solo lo esencial para la IA
+      const simplifiedItems = cart.items.map(item => ({
+        item_id: item.id,
+        product_name: item.product?.name || 'Producto',
+        qty: item.qty,
+        price: item.product?.price || 0,
+        subtotal: item.subtotal
+      }));
+      
       return {
-        ...cart,
         cart_id: cart.id,
-        reminder: 'Este es tu carrito activo. Usa este cart_id para agregar más productos.'
+        items: simplifiedItems,
+        items_count: simplifiedItems.length,
+        total: cart.total
       };
     }
 
     case 'add_to_cart': {
       const productId = String(args.product_id).padStart(4, '0');
       const item = await cartService.addProductToCart(args.cart_id, productId, args.qty || 1);
+      // Payload simplificado - solo datos esenciales, sin objetos anidados profundos
       return { 
         cart_id: args.cart_id,
-        item, 
-        message: 'Producto agregado al carrito',
-        reminder: 'Para agregar más productos, usa el mismo cart_id: ' + args.cart_id
+        item_id: item.id,
+        product_id: item.product_id,
+        qty: item.qty,
+        status: 'added',
+        message: 'Producto agregado al carrito'
       };
     }
 
@@ -182,8 +215,9 @@ async function executeTool(
       const item = await cartService.updateCartItem(args.cart_id, args.item_id, args.qty);
       return { 
         cart_id: args.cart_id,
-        item, 
-        message: 'Cantidad actualizada' 
+        item_id: item.id,
+        qty: item.qty,
+        status: 'updated'
       };
     }
 
@@ -191,7 +225,8 @@ async function executeTool(
       await cartService.removeCartItem(args.cart_id, args.item_id);
       return { 
         cart_id: args.cart_id,
-        message: 'Item eliminado del carrito' 
+        item_id: args.item_id,
+        status: 'removed'
       };
     }
 
@@ -209,15 +244,22 @@ function createSSEResponse(
   request: Request
 ): Response {
   const encoder = new TextEncoder();
+  let pingCount = 0;
   
   // ReadableStream para SSE
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: any) => {
-        const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-        controller.enqueue(encoder.encode(message));
+        try {
+          const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        } catch (error) {
+          console.error('❌ Failed to send SSE message:', error);
+        }
       };
 
+      console.log('🔌 SSE stream started - connection active');
+      
       // 1️⃣ Enviar endpoint info
       send('endpoint', {
         url: new URL(request.url).origin + '/sse'
@@ -243,18 +285,23 @@ function createSSEResponse(
         jsonrpc: '2.0',
         method: 'notifications/tools/list_changed'
       });
+      
+      console.log('✅ SSE handshake completed - ready for tool calls');
 
-      // Keep-alive ping cada 10 segundos (reducido para Chatwoot/WhatsApp)
+      // Keep-alive ping cada 5 segundos (muy agresivo para Chatwoot/WhatsApp)
       const pingInterval = setInterval(() => {
         try {
-          const pingData = { timestamp: new Date().toISOString() };
+          const pingData = { 
+            timestamp: new Date().toISOString(),
+            type: 'keepalive'
+          };
           send('ping', pingData);
           console.log('📡 SSE ping sent:', pingData.timestamp);
         } catch (error) {
           console.error('❌ Ping failed, closing connection:', error);
           clearInterval(pingInterval);
         }
-      }, 10000);
+      }, 5000);
 
       // Mantener conexión abierta
       // El cliente enviará requests vía POST /sse/message
@@ -300,7 +347,7 @@ export async function handleSSE(
     const clientIp = request.headers.get('cf-connecting-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     console.log('🔌 SSE Connection opened from:', clientIp, '| User-Agent:', userAgent);
-    console.log('⏰ Keep-alive ping interval: 10 seconds');
+    console.log('⏰ Keep-alive ping interval: 5 seconds (aggressive mode)');
     return createSSEResponse(productService, cartService, request);
   }
 
@@ -336,26 +383,33 @@ export async function handleSSE(
             console.log(`🎯 Tool call received: ${name}`);
             const toolResult = await executeTool(name, args || {}, productService, cartService);
             console.log(`✅ Tool ${name} executed successfully`);
+            
+            // Convertir a string y verificar tamaño
+            const resultString = JSON.stringify(toolResult);
+            console.log(`📦 Response size: ${resultString.length} bytes`);
+            
+            // Sanitizar caracteres problemáticos
+            const sanitizedResult = resultString
+              .replace(/[\u0000-\u001F]/g, '') // Remove control characters
+              .replace(/\\n/g, ' ')            // Replace newlines with spaces
+              .replace(/\\t/g, ' ');           // Replace tabs with spaces
+            
             result = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(toolResult, null, 2)
+                  text: sanitizedResult
                 }
               ]
             };
           } catch (error: any) {
             console.error(`❌ Tool ${name} failed:`, error.message);
+            // Respuesta de error simplificada
             result = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    error: error.message,
-                    tool: name,
-                    args: args,
-                    timestamp: new Date().toISOString()
-                  }, null, 2)
+                  text: JSON.stringify({ error: error.message, tool: name })
                 }
               ],
               isError: true
@@ -383,11 +437,17 @@ export async function handleSSE(
           });
       }
 
-      return new Response(JSON.stringify({
+      // SIEMPRE devolver 200 OK con respuesta válida
+      const responseBody = JSON.stringify({
         jsonrpc: '2.0',
         id: body.id,
         result
-      }), {
+      });
+      
+      console.log(`📤 Sending response for ${body.method} (${responseBody.length} bytes)`);
+      
+      return new Response(responseBody, {
+        status: 200, // Siempre 200 para evitar que Chatwoot marque como error
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
@@ -396,14 +456,22 @@ export async function handleSSE(
 
     } catch (error: any) {
       console.error('❌ SSE Error:', error);
+      // Incluso en error, devolver 200 con estructura de error válida
+      // para evitar que Chatwoot marque la conversación como "open"
       return new Response(JSON.stringify({
         jsonrpc: '2.0',
-        error: {
-          code: -32700,
-          message: 'Parse error'
+        id: null,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ error: 'Parse error', details: error.message })
+            }
+          ],
+          isError: true
         }
       }), {
-        status: 400,
+        status: 200, // 200 en lugar de 400 para Chatwoot
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
