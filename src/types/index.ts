@@ -12,7 +12,7 @@ export interface Product {
   id: string;
   name: string;
   description: string | null;
-  price: number; // En centavos
+  price: number; // Precio en pesos enteros (ej: 1058 = $1,058)
   stock: number;
   available?: string; // 'Yes' | 'No'
 }

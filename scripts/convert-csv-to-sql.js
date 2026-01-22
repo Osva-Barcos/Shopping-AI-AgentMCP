@@ -5,7 +5,12 @@
  * Convierte a estructura simple: id, name, description, price, stock
  */
 
-const fs = require('fs');
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Función para limpiar caracteres mal codificados
 function fixEncoding(text) {
@@ -25,7 +30,7 @@ function fixEncoding(text) {
 }
 
 // Leer el CSV
-const csvPath = '../data/products-utf8.csv';
+const csvPath = join(__dirname, '../data/products-utf8.csv');
 console.log('📂 Leyendo CSV...\n');
 
 let content = fs.readFileSync(csvPath, 'utf-8');
@@ -48,7 +53,8 @@ for (let i = 1; i < lines.length; i++) { // Saltar header
   const desc = `${descripcion.trim()} - Categoría: ${categoria}. Precios: 50u=$${precio_50}, 100u=$${precio_100}, 200u=$${precio_200}`;
   
   // Usar el precio más común (precio_50_u) como precio base
-  const price = Math.round(Number(precio_50) * 100); // Convertir a centavos
+  // Los precios en el CSV ya están en pesos enteros (ej: 1058 = $1,058)
+  const price = Number(precio_50);
   const stock = Number(cantidad);
   
   products.push({
@@ -75,7 +81,8 @@ const sqlStatements = products.map(p => {
 const sql = sqlStatements.join('\n');
 
 // Guardar SQL
-fs.writeFileSync('../data/import-products.sql', sql);
+const outputPath = join(__dirname, '../data/import-products.sql');
+fs.writeFileSync(outputPath, sql);
 
 console.log('✅ SQL generado: import-products.sql\n');
 
@@ -86,12 +93,12 @@ const valorTotal = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
 console.log('📊 Estadísticas:');
 console.log(`  Total productos: ${products.length}`);
 console.log(`  Stock total: ${totalStock} unidades`);
-console.log(`  Valor inventario: $${(valorTotal / 100).toLocaleString('es-CL')}`);
+console.log(`  Valor inventario: $${valorTotal.toLocaleString('es-CL')}`);
 
 console.log('\n📦 Primeros 5 productos:');
 products.slice(0, 5).forEach(p => {
   console.log(`  ${p.id}: ${p.name}`);
-  console.log(`       Stock: ${p.stock} - Precio: $${(p.price / 100).toFixed(2)}`);
+  console.log(`       Stock: ${p.stock} - Precio: $${p.price.toLocaleString('es-CL')}`);
 });
 
 console.log('\n🚀 Para importar a D1, ejecuta:');

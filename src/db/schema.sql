@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
-  price INTEGER NOT NULL, -- Precio en centavos para evitar decimales
+  price INTEGER NOT NULL, -- Precio en pesos enteros (ej: 1058 = $1,058)
   stock INTEGER NOT NULL DEFAULT 0,
   available TEXT DEFAULT 'Yes' -- 'Yes' or 'No'
 );
