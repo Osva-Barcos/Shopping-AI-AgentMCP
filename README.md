@@ -19,6 +19,7 @@
 - [API Documentation](#-api-documentation)
 - [MCP Integration](#-mcp-integration)
 - [AI Agent Setup](#-ai-agent-setup)
+- [Troubleshooting](#-troubleshooting)
 - [Database Schema](#-database-schema)
 - [Project Structure](#-project-structure)
 - [Deployment](#-deployment)
@@ -288,7 +289,55 @@ This prompt includes:
 
 ---
 
-## 🗄️ Database Schema
+## � Troubleshooting
+
+### Chatwoot + WhatsApp Integration Issues
+
+If your agent works in the Laburen dashboard but **stops responding after the first message** in Chatwoot/WhatsApp:
+
+**Quick Fix:**
+1. Use the **REST endpoint** instead of SSE:
+   ```
+   https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/api/tools/call
+   ```
+   
+2. Verify user has `organizationId` assigned
+
+3. Deploy latest changes with improved keep-alive (10s)
+
+**📄 Full Guide:** [docs/QUICK_FIX_CHATWOOT.md](docs/QUICK_FIX_CHATWOOT.md)
+
+**📄 Detailed Troubleshooting:** [docs/TROUBLESHOOTING_CHATWOOT_WHATSAPP.md](docs/TROUBLESHOOTING_CHATWOOT_WHATSAPP.md)
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Agent doesn't respond to second message | Use REST endpoint (`/api/tools/call`) instead of SSE |
+| "Missing organizationId" error | Assign organization to user in database |
+| SSE connection timeout | Keep-alive reduced to 10s (redeploy needed) |
+| Tools not found | Verify MCP URL is correct in config |
+
+### Testing
+
+Run diagnostics:
+```bash
+curl https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/diagnostics
+```
+
+Test locally:
+```bash
+.\scripts\test-mcp-connection.ps1
+```
+
+Monitor logs:
+```bash
+wrangler tail --format pretty
+```
+
+---
+
+## �🗄️ Database Schema
 
 ### Products Table
 

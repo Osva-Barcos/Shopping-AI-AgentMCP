@@ -132,7 +132,8 @@ async function executeTool(
   productService: ProductService,
   cartService: CartService
 ): Promise<any> {
-  console.log(`🔧 Executing tool: ${toolName}`, args);
+  const timestamp = new Date().toISOString();
+  console.log(`🔧 [${timestamp}] Executing tool: ${toolName}`, JSON.stringify(args));
 
   switch (toolName) {
     case 'list_products': {
@@ -243,14 +244,17 @@ function createSSEResponse(
         method: 'notifications/tools/list_changed'
       });
 
-      // Keep-alive ping cada 30 segundos
+      // Keep-alive ping cada 10 segundos (reducido para Chatwoot/WhatsApp)
       const pingInterval = setInterval(() => {
         try {
-          send('ping', { timestamp: new Date().toISOString() });
-        } catch {
+          const pingData = { timestamp: new Date().toISOString() };
+          send('ping', pingData);
+          console.log('📡 SSE ping sent:', pingData.timestamp);
+        } catch (error) {
+          console.error('❌ Ping failed, closing connection:', error);
           clearInterval(pingInterval);
         }
-      }, 30000);
+      }, 10000);
 
       // Mantener conexión abierta
       // El cliente enviará requests vía POST /sse/message
@@ -293,7 +297,10 @@ export async function handleSSE(
 
   // GET /sse - Iniciar conexión SSE
   if (request.method === 'GET' && (path === '/sse' || path === '/sse/')) {
-    console.log('🔌 SSE Connection opened');
+    const clientIp = request.headers.get('cf-connecting-ip') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    console.log('🔌 SSE Connection opened from:', clientIp, '| User-Agent:', userAgent);
+    console.log('⏰ Keep-alive ping interval: 10 seconds');
     return createSSEResponse(productService, cartService, request);
   }
 
@@ -326,7 +333,9 @@ export async function handleSSE(
         case 'tools/call':
           const { name, arguments: args } = (body as MCPToolCall).params;
           try {
+            console.log(`🎯 Tool call received: ${name}`);
             const toolResult = await executeTool(name, args || {}, productService, cartService);
+            console.log(`✅ Tool ${name} executed successfully`);
             result = {
               content: [
                 {
@@ -336,11 +345,17 @@ export async function handleSSE(
               ]
             };
           } catch (error: any) {
+            console.error(`❌ Tool ${name} failed:`, error.message);
             result = {
               content: [
                 {
                   type: 'text',
-                  text: `Error: ${error.message}`
+                  text: JSON.stringify({
+                    error: error.message,
+                    tool: name,
+                    args: args,
+                    timestamp: new Date().toISOString()
+                  }, null, 2)
                 }
               ],
               isError: true

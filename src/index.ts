@@ -62,7 +62,45 @@ export default {
             success: true,
             service: 'Laburen AI Agent MCP',
             status: 'healthy',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            endpoints: {
+              rest_api: '/products, /carts',
+              mcp_sse: '/sse (Server-Sent Events)',
+              mcp_rest: '/api/tools/call (Stateless)',
+              health: '/health',
+              diagnostics: '/diagnostics'
+            },
+            config: {
+              sse_keepalive_interval: '10 seconds',
+              cors_enabled: true
+            }
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Diagnostics endpoint
+      if (path === '/diagnostics') {
+        const testProducts = await productService.listProducts('pantalon');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            service: 'Laburen AI Agent MCP',
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            tests: {
+              database: testProducts.length > 0 ? 'OK' : 'FAIL',
+              products_count: testProducts.length,
+              sse_endpoint: url.origin + '/sse',
+              rest_endpoint: url.origin + '/api/tools/call'
+            },
+            troubleshooting: {
+              chatwoot_integration: 'If agent stops after first message, use /api/tools/call instead of /sse',
+              missing_organizationId: 'Ensure user has organizationId in Laburen dashboard',
+              connection_timeout: 'SSE keep-alive is set to 10 seconds'
+            }
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

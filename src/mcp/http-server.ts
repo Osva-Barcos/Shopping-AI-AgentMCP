@@ -102,11 +102,18 @@ const httpServer = createServer(async (req, res) => {
     });
 
     req.on('end', async () => {
+      const timestamp = new Date().toISOString();
       try {
         const { tool, args } = JSON.parse(body);
-        console.log(`🔧 Llamando herramienta: ${tool}`, args);
+        console.log(`🔧 [${timestamp}] Llamando herramienta: ${tool}`, JSON.stringify(args));
         
         const apiClient = new ApiClient(API_URL);
+        
+        // Validar que la herramienta existe
+        const validTools = ['list_products', 'get_product', 'search_products', 'create_cart', 'add_to_cart', 'get_cart', 'update_cart_item', 'remove_from_cart'];
+        if (!validTools.includes(tool)) {
+          throw new Error(`Herramienta no encontrada: ${tool}. Herramientas válidas: ${validTools.join(', ')}`);
+        }
         
         // Llamar directamente a la herramienta
         let result;
@@ -115,6 +122,9 @@ const httpServer = createServer(async (req, res) => {
             result = await apiClient.listProducts(args?.search);
             break;
           case 'get_product':
+            if (!args?.product_id) {
+              throw new Error('product_id es requerido');
+            }
             result = await apiClient.getProduct(args.product_id);
             break;
           case 'search_products':
@@ -124,12 +134,27 @@ const httpServer = createServer(async (req, res) => {
             result = await apiClient.createCart();
             break;
           case 'add_to_cart':
-            result = await apiClient.addToCart(args.cart_id, args.product_id, args.qty);
+            if (!args?.cart_id || !args?.product_id) {
+              throw new Error('cart_id y product_id son requeridos');
+            }
+            result = await apiClient.addToCart(args.cart_id, args.product_id, args.qty || 1);
             break;
           case 'get_cart':
+            if (!args?.cart_id) {
+              throw new Error('cart_id es requerido');
+            }
             result = await apiClient.getCart(args.cart_id);
             break;
+          case 'update_cart_item':
+            if (!args?.cart_id || !args?.item_id || !args?.qty) {
+              throw new Error('cart_id, item_id y qty son requeridos');
+            }
+            result = await apiClient.updateCartItem(args.cart_id, args.item_id, args.qty);
+            break;
           case 'remove_from_cart':
+            if (!args?.cart_id || !args?.item_id) {
+              throw new Error('cart_id y item_id son requeridos');
+            }
             result = await apiClient.removeCartItem(args.cart_id, args.item_id);
             break;
           default:
@@ -138,11 +163,15 @@ const httpServer = createServer(async (req, res) => {
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, data: result }));
-        console.log(`✅ Herramienta ${tool} ejecutada exitosamente`);
+        console.log(`✅ [${timestamp}] Herramienta ${tool} ejecutada exitosamente`);
       } catch (error: any) {
-        console.error('❌ Error ejecutando herramienta:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: error.message }));
+        console.error(`❌ [${timestamp}] Error ejecutando herramienta:`, error.message);
+        res.writeHead(error.message.includes('requerido') ? 400 : 500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: false, 
+          error: error.message,
+          timestamp: timestamp
+        }));
       }
     });
     return;
