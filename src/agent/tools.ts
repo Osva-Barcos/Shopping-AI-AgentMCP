@@ -18,14 +18,44 @@ export const AGENT_TOOLS = [
     function: {
       name: 'list_products',
       description:
-        'Lista los productos disponibles en el catálogo de la tienda. Úsalo cuando el usuario quiera ver productos, buscar algo específico, o explorar el catálogo. Puedes filtrar por término de búsqueda.',
+        'Lista los productos disponibles en el catálogo. Úsalo cuando el usuario quiera ver productos o explorar el catálogo. Si el usuario pide algo específico (color, talla o tipo), usa search_products_by_attributes en vez de esta tool.',
       parameters: {
         type: 'object',
         properties: {
           search: {
             type: 'string',
             description:
-              'Término de búsqueda opcional. Puede ser nombre, color, tipo de prenda o talla. Ejemplo: "camiseta azul", "talla M", "pantalón".',
+              'Término de búsqueda genérico. Ejemplo: "camiseta", "pantalón".',
+          },
+          limit: {
+            type: 'number',
+            description: 'Máximo de productos a retornar. Default: 8.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_products_by_attributes',
+      description:
+        'Busca productos por color, talla y/o tipo de prenda. Úsala SIEMPRE que el usuario mencione un color (ej: azul, negro, rojo), una talla (ej: S, M, L, XL, XXL) o un tipo de prenda (ej: camiseta, pantalón, falda, chaqueta, sudadera). Puedes combinar varios filtros a la vez.',
+      parameters: {
+        type: 'object',
+        properties: {
+          color: {
+            type: 'string',
+            description: 'Color de la prenda. Valores comunes: Verde, Azul, Negro, Blanco, Gris, Amarillo, Rojo.',
+          },
+          size: {
+            type: 'string',
+            description: 'Talla de la prenda. Valores: S, M, L, XL, XXL.',
+          },
+          type: {
+            type: 'string',
+            description: 'Tipo de prenda. Valores: Camiseta, Pantalón, Falda, Chaqueta, Sudadera.',
           },
           limit: {
             type: 'number',
@@ -188,6 +218,48 @@ export async function executeTool(
           available: p.available,
         }));
         result = { products: simplified, count: simplified.length, total_in_catalog: allProducts.length };
+        break;
+      }
+
+      case 'search_products_by_attributes': {
+        // Construir término de búsqueda combinando atributos detectados
+        const terms: string[] = [];
+        if (args.color) terms.push(args.color);
+        if (args.size) terms.push(args.size);
+        if (args.type) terms.push(args.type);
+        const searchTerm = terms.join(' ');
+
+        let allProducts = await productService.listProducts(searchTerm || undefined);
+
+        // Filtrado post-proceso para evitar falsos positivos (ej: 'L' matcheando 'XXL')
+        if (args.size) {
+          const sizePattern = new RegExp(`\\b${args.size}\\b`, 'i');
+          allProducts = allProducts.filter((p) => sizePattern.test(p.name));
+        }
+        if (args.color) {
+          const colorPattern = new RegExp(`\\b${args.color}\\b`, 'i');
+          allProducts = allProducts.filter((p) => colorPattern.test(p.name));
+        }
+        if (args.type) {
+          const typePattern = new RegExp(`\\b${args.type}\\b`, 'i');
+          allProducts = allProducts.filter((p) => typePattern.test(p.name));
+        }
+
+        const limit = args.limit ?? 8;
+        const products = allProducts.slice(0, limit);
+        const simplified = products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          stock: p.stock,
+          available: p.available,
+        }));
+        result = {
+          products: simplified,
+          count: simplified.length,
+          filters: { color: args.color, size: args.size, type: args.type },
+          total_in_catalog: allProducts.length,
+        };
         break;
       }
 

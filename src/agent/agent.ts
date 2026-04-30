@@ -120,6 +120,24 @@ export class AiShopAgent {
         role: 'assistant',
         content: '¡Encontré estas opciones para ti! 👕\n• Pantalón Verde — $1,058 (177 disponibles)\n¿Alguno te interesa?',
       },
+      {
+        role: 'user',
+        content: 'Traeme ropa talle L',
+      },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'fs_2', name: 'search_products_by_attributes', arguments: '{"size":"L"}' }],
+      },
+      {
+        role: 'tool',
+        content: '{"products":[{"id":"0007","name":"Pantalón Gris Talla L","price":1331,"stock":436}],"count":1,"filters":{"size":"L"}}',
+        tool_call_id: 'fs_2',
+      },
+      {
+        role: 'assistant',
+        content: '¡Encontré productos en talla L! 👕\n• Pantalón Gris Talla L — $1,331 (436 disponibles)\n¿Te interesa alguno?',
+      },
     ];
 
     // Construir el array de mensajes para el LLM
