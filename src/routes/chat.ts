@@ -11,15 +11,18 @@
 import { Env, ChatRequest, ChatResponse, ChatMessage } from '../types/index.js';
 import { ProductService } from '../services/product.service.js';
 import { CartService } from '../services/cart.service.js';
-import { LaburenAgent } from '../agent/agent.js';
+import { SessionService } from '../services/session.service.js';
+import { AiShopAgent } from '../agent/agent.js';
 
 export class ChatRoutes {
   private productService: ProductService;
   private cartService: CartService;
+  private sessionService: SessionService;
 
-  constructor(productService: ProductService, cartService: CartService) {
+  constructor(productService: ProductService, cartService: CartService, sessionService: SessionService) {
     this.productService = productService;
     this.cartService = cartService;
+    this.sessionService = sessionService;
   }
 
   async handleRequest(request: Request, env: Env): Promise<Response> {
@@ -67,11 +70,14 @@ export class ChatRoutes {
 
       console.log(`💬 Chat request — session: ${sessionId} — message: "${message.substring(0, 80)}"`);
 
+      // Asegurar que la tabla de sesiones exista
+      await this.sessionService.ensureTable();
+
       // Instanciar el agente con el env actual
-      const agent = new LaburenAgent(env, this.productService, this.cartService);
+      const agent = new AiShopAgent(env, this.productService, this.cartService, this.sessionService);
 
       // Ejecutar el loop del agente
-      const reply = await agent.chat(message.trim(), history as ChatMessage[]);
+      const reply = await agent.chat(message.trim(), history as ChatMessage[], sessionId);
 
       const responseBody: ChatResponse = {
         reply,

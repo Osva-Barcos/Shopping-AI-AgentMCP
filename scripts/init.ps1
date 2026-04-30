@@ -24,7 +24,7 @@ $loadSeed = Read-Host
 
 if ($loadSeed -eq 'S' -or $loadSeed -eq 's') {
     Write-Host "Cargando datos de ejemplo..." -ForegroundColor Cyan
-    wrangler d1 execute laburen-ai-db --file=./src/db/seed.sql
+    wrangler d1 execute ai-shop-db --file=./src/db/seed.sql
 }
 
 # 5. Iniciar desarrollo local

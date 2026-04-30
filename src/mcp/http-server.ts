@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Servidor HTTP para exponer MCP via SSE
- * Para integración con dashboards web como Laburen
+ * Para integración con dashboards web
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -14,7 +14,7 @@ import { createServer } from 'http';
 import { ApiClient } from './api-client.js';
 
 const PORT = process.env.PORT || 3000;
-const API_URL = process.env.API_URL || 'https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev';
+const API_URL = process.env.API_URL || 'https://ai-shop-agent.mcp-osvaldo.workers.dev';
 
 console.log(`🔧 Initializing MCP HTTP Server`);
 console.log(`🌐 API URL: ${API_URL}`);
@@ -71,7 +71,7 @@ const httpServer = createServer(async (req, res) => {
     const apiClient = new ApiClient(API_URL);
     const mcpServer = new Server(
       {
-        name: 'laburen-shop-mcp',
+        name: 'ai-shop-mcp',
         version: '1.0.0',
       },
       {
@@ -182,7 +182,7 @@ const httpServer = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'healthy',
-      service: 'Laburen MCP HTTP Server',
+      service: 'AI Shop MCP HTTP Server',
       version: '1.0.0',
       endpoints: {
         sse: '/sse (MCP protocol)',
@@ -205,7 +205,7 @@ function setupMCPHandlers(server: Server, apiClient: ApiClient) {
     tools: [
       {
         name: 'list_products',
-        description: `Obtiene el catálogo completo de productos de moda disponibles en la tienda Laburen.
+          description: `Obtiene el catálogo completo de productos de moda disponibles en la tienda.
 
 **Información retornada por producto:**
 - ID único (formato "0001")

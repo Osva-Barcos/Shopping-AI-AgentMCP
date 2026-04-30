@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuración
-const WRANGLER_DB = 'laburen-ai-db';
+const WRANGLER_DB = 'ai-shop-db';
 
 /**
  * Genera un ID simple para productos

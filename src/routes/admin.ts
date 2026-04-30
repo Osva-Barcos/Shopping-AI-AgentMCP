@@ -19,7 +19,7 @@ export class AdminRoutes {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - Productos | Laburen MCP</title>
+  <title>Admin - Productos | AI Shop</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -123,7 +123,7 @@ export class AdminRoutes {
 <body>
   <div class="container">
     <h1>🛍️ Panel de Productos</h1>
-    <p style="color: #666; margin-bottom: 20px;">Laburen AI Agent MCP - Admin</p>
+    <p style="color: #666; margin-bottom: 20px;">AI Shopping Agent - Admin</p>
     
     <div class="stats">
       <div class="stat-card">

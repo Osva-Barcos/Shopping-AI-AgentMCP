@@ -1,8 +1,8 @@
 /**
- * Laburen AI Agent
+ * AI Shopping Agent
  *
  * Agente de inteligencia artificial que usa Cloudflare Workers AI (Llama 3.1)
- * con function-calling para interactuar con la base de datos de Laburen.
+ * con function-calling para interactuar con el catálogo de productos.
  *
  * Flujo agentico:
  * 1. Recibe el mensaje del usuario + historial
@@ -15,10 +15,11 @@
 import { Env, ChatMessage } from '../types/index.js';
 import { ProductService } from '../services/product.service.js';
 import { CartService } from '../services/cart.service.js';
+import { SessionService } from '../services/session.service.js';
 import { AGENT_TOOLS, executeTool } from './tools.js';
 
 // System prompt del agente
-const SYSTEM_PROMPT = `Eres Lau, la asistente de compras de Laburen, una tienda de moda. 
+const SYSTEM_PROMPT = `Eres el Asistente de Compras de una tienda de moda.
 Eres amigable, entusiasta y muy útil. Siempre respondes en español.
 
 Tu trabajo:
@@ -35,6 +36,7 @@ Reglas importantes:
 - Si algo falla, explica qué pasó de forma clara y ofrece alternativas.
 - Cuando muestres productos, muestra: nombre, precio y stock disponible.
 - Siempre pregunta si el usuario necesita algo más después de cada acción.
+- NUNCA describas las funciones disponibles. Si necesitas información, USA las tools directamente.
 
 Ejemplo de respuesta al mostrar productos:
 "¡Encontré estas opciones para ti! 👕
@@ -42,28 +44,93 @@ Ejemplo de respuesta al mostrar productos:
 • Camiseta Negra Talla L — $599 (3 disponibles)
 ¿Alguna te interesa? Te la agrego al carrito 🛒"`;
 
-export class LaburenAgent {
+/**
+ * Intenta extraer tool calls desde una respuesta de texto plano.
+ * Algunos modelos generan JSON en vez de usar tool_calls nativas.
+ */
+function parseToolCallsFromText(text: string): any[] | null {
+  if (!text || typeof text !== 'string') return null;
+
+  // Buscar bloques JSON tipo: {"function": "list_products", "arguments": {...}}
+  // o {"tool": "list_products", "args": {...}}
+  const patterns = [
+    /\{\s*["']function["']\s*:\s*["'](\w+)["']\s*,\s*["']arguments["']\s*:\s*(\{[^}]*\})\s*\}/,
+    /\{\s*["']tool["']\s*:\s*["'](\w+)["']\s*,\s*["']arguments["']\s*:\s*(\{[^}]*\})\s*\}/,
+    /\{\s*["']name["']\s*:\s*["'](\w+)["']\s*,\s*["']arguments["']\s*:\s*(\{[^}]*\})\s*\}/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      try {
+        const args = JSON.parse(match[2]);
+        return [{ name: match[1], arguments: args, id: `parsed_${Date.now()}` }];
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  return null;
+}
+
+export class AiShopAgent {
   private productService: ProductService;
   private cartService: CartService;
+  private sessionService: SessionService;
   private ai: Env['AI'];
 
-  constructor(env: Env, productService: ProductService, cartService: CartService) {
+  constructor(env: Env, productService: ProductService, cartService: CartService, sessionService: SessionService) {
     this.ai = env.AI;
     this.productService = productService;
     this.cartService = cartService;
+    this.sessionService = sessionService;
   }
 
   /**
    * Procesa un mensaje del usuario y devuelve la respuesta del agente.
    * Implementa el loop agentico con function-calling.
    */
-  async chat(userMessage: string, history: ChatMessage[] = []): Promise<string> {
+  async chat(userMessage: string, history: ChatMessage[] = [], sessionId?: string): Promise<string> {
+    // Verificar que el binding de AI esté disponible
+    if (!this.ai) {
+      console.error('❌ AI binding is undefined. Make sure [ai] binding is configured in wrangler.toml and you are running with wrangler dev.');
+      throw new Error('El servicio de IA no está configurado. Verifica tu wrangler.toml y que hayas hecho wrangler login.');
+    }
+
+    // Few-shot examples para guiar al modelo a usar tools correctamente.
+    // Solo incluimos el ejemplo de listar productos para evitar que el modelo
+    // copie IDs ficticios de carrito del ejemplo.
+    const fewShotExamples: any[] = [
+      {
+        role: 'user',
+        content: 'Quiero ver los productos disponibles',
+      },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'fs_1', name: 'list_products', arguments: '{}' }],
+      },
+      {
+        role: 'tool',
+        content: '{"products":[{"id":"0001","name":"Pantalón Verde","price":1058,"stock":177}],"count":1}',
+        tool_call_id: 'fs_1',
+      },
+      {
+        role: 'assistant',
+        content: '¡Encontré estas opciones para ti! 👕\n• Pantalón Verde — $1,058 (177 disponibles)\n¿Alguno te interesa?',
+      },
+    ];
+
     // Construir el array de mensajes para el LLM
     const messages: any[] = [
       { role: 'system', content: SYSTEM_PROMPT },
+      ...fewShotExamples,
       ...history.map((msg) => ({
         role: msg.role,
         content: msg.content,
+        tool_calls: msg.tool_calls,
+        tool_call_id: msg.tool_call_id,
       })),
       { role: 'user', content: userMessage },
     ];
@@ -72,6 +139,7 @@ export class LaburenAgent {
 
     // Loop agentico — máximo 5 iteraciones para evitar loops infinitos
     const MAX_ITERATIONS = 5;
+    let reminderAdded = false;
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       console.log(`🔄 Agent iteration ${iteration + 1}`);
@@ -79,15 +147,24 @@ export class LaburenAgent {
       let response: any;
 
       try {
-        // Llamar al LLM con tools disponibles
-        response = await (this.ai as any).run('@cf/meta/llama-3.1-8b-instruct', {
+        // Modelo más robusto para function-calling
+        const modelName = '@cf/meta/llama-3.1-8b-instruct';
+        const requestBody = {
           messages,
           tools: AGENT_TOOLS,
           max_tokens: 1024,
-        });
+        };
+        console.log(`📤 Calling AI model: ${modelName}`);
+        console.log(`📤 Request body (truncated):`, JSON.stringify(requestBody).substring(0, 500));
+
+        // Llamar al LLM con tools disponibles
+        response = await (this.ai as any).run(modelName, requestBody);
+
+        console.log(`📥 Raw AI response:`, JSON.stringify(response));
       } catch (error: any) {
-        console.error('❌ AI call failed:', error.message);
-        throw new Error(`Error al llamar al modelo de IA: ${error.message}`);
+        console.error('❌ AI call failed:', error?.message || error);
+        console.error('❌ AI call stack:', error?.stack || 'No stack trace');
+        throw new Error(`Error al llamar al modelo de IA: ${error?.message || 'Unknown error'}`);
       }
 
       console.log(`📨 LLM response type:`, typeof response);
@@ -120,12 +197,60 @@ export class LaburenAgent {
             toolArgs = {};
           }
 
-          const toolResult = await executeTool(
+          // Si el modelo no proporcionó cart_id pero hay uno en sesión, usarlo
+          if (sessionId && !toolArgs.cart_id &&
+            (toolName === 'add_to_cart' || toolName === 'get_cart' || toolName === 'update_cart_item' || toolName === 'remove_from_cart')) {
+            const sessionCartId = await this.sessionService.getCartId(sessionId);
+            if (sessionCartId) {
+              console.log(`📦 Using cart_id from session: ${sessionCartId}`);
+              toolArgs.cart_id = sessionCartId;
+            }
+          }
+
+          let toolResult = await executeTool(
             toolName,
             toolArgs,
             this.productService,
             this.cartService
           );
+
+          // Auto-corrección: si el modelo intentó usar un carrito inexistente,
+          // primero buscar en la sesión un carrito válido antes de crear uno nuevo.
+          const parsedResult = (() => {
+            try { return JSON.parse(toolResult); } catch { return null; }
+          })();
+
+          const isCartNotFound = parsedResult?.error?.toLowerCase?.().includes('no encontrado') &&
+            (toolName === 'add_to_cart' || toolName === 'get_cart' || toolName === 'update_cart_item' || toolName === 'remove_from_cart');
+
+          if (isCartNotFound && sessionId) {
+            const sessionCartId = await this.sessionService.getCartId(sessionId);
+            if (sessionCartId && sessionCartId !== toolArgs.cart_id) {
+              console.warn(`⚠️ Cart ${toolArgs.cart_id} not found. Retrying with session cart: ${sessionCartId}`);
+              toolArgs.cart_id = sessionCartId;
+              toolResult = await executeTool(toolName, toolArgs, this.productService, this.cartService);
+            } else if (!sessionCartId && toolName === 'add_to_cart') {
+              // Solo crear carrito automáticamente para add_to_cart si no hay sesión
+              console.warn(`⚠️ No session cart found. Auto-creating cart...`);
+              const newCart = await this.cartService.createCart();
+              toolArgs.cart_id = newCart.id;
+              await this.sessionService.setCartId(sessionId, newCart.id);
+              console.log(`💾 Saved cart_id ${newCart.id} to session ${sessionId}`);
+              toolResult = await executeTool(toolName, toolArgs, this.productService, this.cartService);
+            } else if (!sessionCartId && toolName === 'get_cart') {
+              // Para get_cart, no crear carrito vacío; informar que no hay carrito
+              toolResult = JSON.stringify({ items: [], items_count: 0, total: 0, message: 'No tienes un carrito activo todavía.' });
+            }
+          }
+
+          // Si se ejecutó create_cart exitosamente, guardar el cart_id en sesión
+          if (toolName === 'create_cart' && sessionId) {
+            const createdCart = (() => { try { return JSON.parse(toolResult); } catch { return null; } })();
+            if (createdCart?.cart_id) {
+              await this.sessionService.setCartId(sessionId, createdCart.cart_id);
+              console.log(`💾 Saved cart_id ${createdCart.cart_id} to session ${sessionId}`);
+            }
+          }
 
           // Agregar resultado de la tool al historial
           messages.push({
@@ -148,13 +273,62 @@ export class LaburenAgent {
           ?? result?.text
           ?? '';
 
+      // Fallback: si el modelo no usó tool_calls nativas pero escribió un JSON
+      // con una llamada a función en el texto, parsearlo manualmente.
+      const parsedToolCalls = parseToolCallsFromText(textResponse);
+      if (parsedToolCalls && parsedToolCalls.length > 0) {
+        console.log(`🔧 Parsed ${parsedToolCalls.length} tool call(s) from text response`);
+        messages.push({
+          role: 'assistant',
+          content: textResponse,
+        });
+        for (const toolCall of parsedToolCalls) {
+          const toolResult = await executeTool(
+            toolCall.name,
+            toolCall.arguments,
+            this.productService,
+            this.cartService
+          );
+          messages.push({
+            role: 'tool',
+            content: toolResult,
+            tool_call_id: toolCall.id,
+          });
+        }
+        continue;
+      }
+
+      // Si la respuesta parece una descripción técnica de una función en vez de
+      // una respuesta conversacional, agregar un recordatorio y reintentar una vez.
+      const looksLikeTechnicalDescription =
+        !reminderAdded &&
+        textResponse &&
+        (textResponse.toLowerCase().includes('la función') ||
+          textResponse.toLowerCase().includes('devuelve un objeto') ||
+          textResponse.toLowerCase().includes('comando `'));
+
+      if (looksLikeTechnicalDescription) {
+        console.warn('⚠️ LLM described a tool instead of using it. Adding reminder and retrying...');
+        messages.push({
+          role: 'assistant',
+          content: textResponse,
+        });
+        messages.push({
+          role: 'system',
+          content:
+            'IMPORTANTE: No describas las funciones. Si necesitas información de productos o del carrito, USA las tools disponibles llamándolas directamente. No hables sobre "la función list_products" ni sobre comandos. Actúa como Lau, la asistente de compras, y usa las tools para obtener los datos.',
+        });
+        reminderAdded = true;
+        continue;
+      }
+
       if (textResponse) {
         console.log(`✅ Agent finished after ${iteration + 1} iteration(s)`);
         return textResponse.trim();
       }
 
       // Si no hay respuesta de texto ni tool calls, algo salió mal
-      console.warn('⚠️ LLM returned empty response, raw:', JSON.stringify(response).substring(0, 300));
+      console.warn('⚠️ LLM returned empty response, raw:', JSON.stringify(response).substring(0, 500));
       return 'Lo siento, no pude procesar tu mensaje. Por favor intenta de nuevo.';
     }
 

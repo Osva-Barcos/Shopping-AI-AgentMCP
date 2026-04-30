@@ -2,7 +2,7 @@
  * Cliente HTTP para consumir la API REST de Cloudflare Workers
  */
 
-const API_BASE_URL = 'https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev';
+const API_BASE_URL = 'https://ai-shop-agent.mcp-osvaldo.workers.dev';
 
 export class ApiClient {
   private baseUrl: string;

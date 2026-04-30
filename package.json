@@ -1,5 +1,5 @@
 {
-  "name": "laburen-ai-agent-mcp",
+  "name": "ai-shop-agent",
   "version": "1.0.0",
   "description": "MCP HTTP backend para Agente de IA conversacional - Cloudflare Workers",
   "main": "src/index.ts",
@@ -23,7 +23,7 @@
     "workers",
     "ai",
     "agent",
-    "laburen"
+    "ai-shop"
   ],
   "author": "",
   "license": "MIT",

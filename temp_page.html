@@ -1,11 +1,4 @@
-/**
- * Frontend HTML — AI Shopping Chat
- *
- * Página minimalista con un widget de chat flotante.
- * Se comunica con el endpoint POST /chat.
- */
-
-export const FRONTEND_HTML = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -512,7 +505,14 @@ export const FRONTEND_HTML = `<!DOCTYPE html>
         notifDot.style.display = 'none';
         if (messages.children.length === 0) {
           setTimeout(() => {
-            addMessage('bot', \`¡Hola! 👋 Soy tu asistente de compras.\n\nPuedo ayudarte a:\n• Buscar productos por nombre, color o talla\n• Agregar cosas a tu carrito 🛒\n• Ver y editar tu carrito\n\n¿Qué estás buscando hoy?\`);
+            addMessage('bot', '¡Hola! 👋 Soy tu asistente de compras.
+
+Puedo ayudarte a:
+• Buscar productos por nombre, color o talla
+• Agregar cosas a tu carrito 🛒
+• Ver y editar tu carrito
+
+¿Qué estás buscando hoy?');
           }, 350);
         }
         setTimeout(() => input.focus(), 400);
@@ -629,4 +629,4 @@ export const FRONTEND_HTML = `<!DOCTYPE html>
     }, 2000);
   </script>
 </body>
-</html>`;
+</html>

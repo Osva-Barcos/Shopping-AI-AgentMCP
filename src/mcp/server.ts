@@ -10,7 +10,7 @@ import { ApiClient } from './api-client.js';
  * MCP Server para el sistema de carrito de compras
  * Usa la API REST desplegada en Cloudflare Workers
  */
-export class LaburenMCPServer {
+export class AiShopMCPServer {
   private server: Server;
   private apiClient: ApiClient;
 
@@ -20,7 +20,7 @@ export class LaburenMCPServer {
     // Crear servidor MCP
     this.server = new Server(
       {
-        name: 'laburen-shop-mcp',
+        name: 'ai-shop-mcp',
         version: '1.0.0',
       },
       {
@@ -40,7 +40,7 @@ export class LaburenMCPServer {
       tools: [
         {
           name: 'list_products',
-          description: `Obtiene el catálogo completo de productos de moda disponibles en la tienda Laburen.
+          description: `Obtiene el catálogo completo de productos de moda disponibles en la tienda.
 
 **Información retornada por producto:**
 - ID único (formato "0001")
@@ -505,6 +505,6 @@ Sin problema, ¿te ayudo a buscar algo diferente? 😊"`,
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('Laburen MCP Server running on stdio');
+    console.error('AI Shop MCP Server running on stdio');
   }
 }

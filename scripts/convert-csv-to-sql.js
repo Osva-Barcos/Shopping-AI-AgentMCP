@@ -102,6 +102,6 @@ products.slice(0, 5).forEach(p => {
 });
 
 console.log('\n🚀 Para importar a D1, ejecuta:');
-console.log('   wrangler d1 execute laburen-ai-db --file=import-products.sql');
+console.log('   wrangler d1 execute ai-shop-db --file=import-products.sql');
 console.log('\n   O en local para testing:');
 console.log('   wrangler d1 execute laburen-ai-db --local --file=import-products.sql\n');

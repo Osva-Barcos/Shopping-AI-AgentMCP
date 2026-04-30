@@ -1,9 +1,9 @@
 # Script de prueba para verificar la conexión MCP y diagnosticar problemas
 # Uso: .\test-mcp-connection.ps1
 
-$API_URL = "https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev"
+$API_URL = "https://ai-shop-agent.mcp-osvaldo.workers.dev"
 
-Write-Host "🧪 Testing Laburen MCP Server Connection" -ForegroundColor Cyan
+Write-Host "🧪 Testing AI Shop MCP Server Connection" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Test 1: Health Check
@@ -136,13 +136,13 @@ Write-Host "✅ Recommendations for Chatwoot/WhatsApp Integration:" -ForegroundC
 Write-Host "   1. Use REST endpoint instead of SSE:" -ForegroundColor White
 Write-Host "      $API_URL/api/tools/call`n" -ForegroundColor Gray
 
-Write-Host "   2. Configure in Laburen Dashboard:" -ForegroundColor White
+Write-Host "   2. Configure in your Dashboard:" -ForegroundColor White
 Write-Host "      - MCP URL: Use the REST endpoint above" -ForegroundColor Gray
 Write-Host "      - Method: POST" -ForegroundColor Gray
 Write-Host "      - Body format: { tool: 'tool_name', args: {...} }`n" -ForegroundColor Gray
 
 Write-Host "   3. Verify user has organizationId:" -ForegroundColor White
-Write-Host "      - Check in Laburen database" -ForegroundColor Gray
+Write-Host "      - Check in your database" -ForegroundColor Gray
 Write-Host "      - User ID from error: cmkn0zpsl0ti9oxqcmr0g5p1u`n" -ForegroundColor Gray
 
 Write-Host "   4. Monitor Cloudflare Workers logs:" -ForegroundColor White

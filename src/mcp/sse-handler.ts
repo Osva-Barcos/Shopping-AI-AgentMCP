@@ -3,10 +3,10 @@
  * 
  * Implementa el protocolo MCP sobre SSE para integraciones con:
  * - Claude Desktop
- * - Laburen Dashboard
+ * - Cualquier dashboard web
  * - Cualquier cliente MCP compatible
  * 
- * URL: https://laburen-ai-agent-mcp.mcp-osvaldo.workers.dev/sse
+ * URL: https://ai-shop-agent.mcp-osvaldo.workers.dev/sse
  */
 
 import { ProductService } from '../services/product.service';
@@ -271,7 +271,7 @@ function createSSEResponse(
         method: 'notifications/initialized',
         params: {
           serverInfo: {
-            name: 'laburen-ai-agent-mcp',
+            name: 'ai-shop-agent',
             version: '1.0.0'
           },
           capabilities: {
@@ -364,7 +364,7 @@ export async function handleSSE(
           result = {
             protocolVersion: '2024-11-05',
             serverInfo: {
-              name: 'laburen-ai-agent-mcp',
+              name: 'ai-shop-agent',
               version: '1.0.0'
             },
             capabilities: {

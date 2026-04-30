@@ -1,5 +1,5 @@
 -- Schema para Cloudflare D1 (SQLite)
--- MCP Backend - Laburen AI Agent
+-- MCP Backend - AI Shopping Agent
 
 -- Tabla de productos
 CREATE TABLE IF NOT EXISTS products (
@@ -33,3 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);
 CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON cart_items(product_id);
 -- Índice compuesto para búsquedas de items por carrito y producto
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart_product ON cart_items(cart_id, product_id);
+
+-- Tabla de sesiones (persiste cart_id por session_id)
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id TEXT PRIMARY KEY,
+  cart_id TEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

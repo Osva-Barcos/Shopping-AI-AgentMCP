@@ -1,5 +1,5 @@
 /**
- * Laburen AI Agent — Cloudflare Worker
+ * AI Shopping Agent — Cloudflare Worker
  *
  * Endpoints:
  * - GET    /              — Frontend del chat (página principal)
@@ -22,6 +22,7 @@ import { ProductRoutes } from './routes/products.js';
 import { CartRoutes } from './routes/carts.js';
 import { AdminRoutes } from './routes/admin.js';
 import { ChatRoutes } from './routes/chat.js';
+import { SessionService } from './services/session.service.js';
 import { errorResponse } from './utils/errors.js';
 import { handleSSE } from './mcp/sse-handler.js';
 import { FRONTEND_HTML } from './frontend.js';
@@ -61,7 +62,7 @@ export default {
         return new Response(
           JSON.stringify({
             success: true,
-            service: 'Laburen AI Agent',
+            service: 'AI Shopping Agent',
             status: 'healthy',
             timestamp: new Date().toISOString(),
             endpoints: {
@@ -78,16 +79,47 @@ export default {
       // ── Diagnostics ───────────────────────────────────────────────────────
       if (path === '/diagnostics') {
         const testProducts = await productService.listProducts('pantalon');
+
+        // Probar conexión con Cloudflare Workers AI
+        let aiStatus = 'NOT_TESTED';
+        let aiError = null;
+        let aiResponseSample = null;
+
+        try {
+          if (env.AI) {
+            const aiResult = await (env.AI as any).run('@cf/meta/llama-3.1-8b-instruct', {
+              messages: [
+                { role: 'system', content: 'Eres un asistente útil. Responde solo con una palabra.' },
+                { role: 'user', content: 'Di "OK" si estás funcionando.' },
+              ],
+              max_tokens: 10,
+            });
+            aiResponseSample = typeof aiResult === 'string' ? aiResult : JSON.stringify(aiResult).substring(0, 200);
+            aiStatus = 'OK';
+          } else {
+            aiStatus = 'MISSING_BINDING';
+            aiError = 'env.AI is undefined. Check wrangler.toml [ai] binding.';
+          }
+        } catch (err: any) {
+          aiStatus = 'FAIL';
+          aiError = err?.message || 'Unknown AI error';
+          console.error('Diagnostics AI test failed:', err);
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
-            service: 'Laburen AI Agent',
+            service: 'AI Shopping Agent',
             status: 'healthy',
             timestamp: new Date().toISOString(),
             tests: {
               database: testProducts.length > 0 ? 'OK' : 'FAIL',
               products_count: testProducts.length,
+              ai_binding: env.AI ? 'FOUND' : 'MISSING',
               ai_model: '@cf/meta/llama-3.1-8b-instruct',
+              ai_status: aiStatus,
+              ai_error: aiError,
+              ai_response_sample: aiResponseSample,
               chat_endpoint: url.origin + '/chat',
             },
           }),
@@ -99,7 +131,8 @@ export default {
 
       // ── Chat endpoint (agente de IA) ─────────────────────────────────────
       if (path === '/chat') {
-        const chatRoutes = new ChatRoutes(productService, cartService);
+        const sessionService = new SessionService(dbClient);
+        const chatRoutes = new ChatRoutes(productService, cartService, sessionService);
         return await chatRoutes.handleRequest(request, env);
       }
 

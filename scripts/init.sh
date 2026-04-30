@@ -25,7 +25,7 @@ read -r loadSeed
 
 if [ "$loadSeed" = "s" ] || [ "$loadSeed" = "S" ]; then
     echo "Cargando datos de ejemplo..."
-    wrangler d1 execute laburen-ai-db --file=./src/db/seed.sql
+    wrangler d1 execute ai-shop-db --file=./src/db/seed.sql
 fi
 
 echo ""

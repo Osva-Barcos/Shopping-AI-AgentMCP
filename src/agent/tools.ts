@@ -1,5 +1,5 @@
 /**
- * Agent Tools — Laburen AI Agent
+ * Agent Tools — AI Shopping Agent
  *
  * Define las herramientas (tools) disponibles para el agente de IA.
  * Estas tools se pasan al LLM como function-calling y se ejecutan
@@ -18,7 +18,7 @@ export const AGENT_TOOLS = [
     function: {
       name: 'list_products',
       description:
-        'Lista los productos disponibles en el catálogo de Laburen. Úsalo cuando el usuario quiera ver productos, buscar algo específico, o explorar el catálogo. Puedes filtrar por término de búsqueda.',
+        'Lista los productos disponibles en el catálogo de la tienda. Úsalo cuando el usuario quiera ver productos, buscar algo específico, o explorar el catálogo. Puedes filtrar por término de búsqueda.',
       parameters: {
         type: 'object',
         properties: {
