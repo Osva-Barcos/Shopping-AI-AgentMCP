@@ -3,7 +3,40 @@
 // ===== Environment =====
 export interface Env {
   DB: D1Database;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  AI: any; // Cloudflare Workers AI binding (type added in newer @cloudflare/workers-types)
   ENVIRONMENT?: string;
+}
+
+// ===== Chat / Agent Types =====
+
+export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  tool_call_id?: string;
+  tool_calls?: ToolCall[];
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string; // JSON string
+  };
+}
+
+export interface ChatRequest {
+  message: string;
+  session_id?: string;
+  history?: ChatMessage[];
+}
+
+export interface ChatResponse {
+  reply: string;
+  session_id: string;
 }
 
 // ===== Entidades de Base de Datos =====

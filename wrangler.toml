@@ -7,8 +7,12 @@ node_compat = true
 [[d1_databases]]
 binding = "DB" # Variable disponible en el código
 database_name = "laburen-ai-db"
-database_id = "dcc0ae8b-aa76-4250-ad47-0780867c6e96" # Se completa después de crear la DB con: wrangler d1 create laburen-ai-db
+database_id = "dcc0ae8b-aa76-4250-ad47-0780867c6e96"
 
-# Variables de entorno (opcional)
+# Cloudflare Workers AI — Gratis, sin API key
+[ai]
+binding = "AI"
+
+# Variables de entorno
 [vars]
 ENVIRONMENT = "production"

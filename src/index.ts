@@ -1,39 +1,39 @@
 /**
- * MCP HTTP Backend - Laburen AI Agent
- * 
- * Cloudflare Worker con endpoints REST para manejo de productos y carritos
- * Diseñado para ser consumido por un Agente de IA conversacional
- * 
+ * Laburen AI Agent — Cloudflare Worker
+ *
  * Endpoints:
- * - GET    /products           - Lista productos (con filtro opcional ?search=...)
- * - GET    /products/:id       - Obtiene un producto
- * - POST   /carts              - Crea un carrito nuevo
- * - GET    /carts/:cart_id     - Obtiene un carrito con items
- * - POST   /carts/:cart_id/items - Agrega producto al carrito (body: {product_id, qty})
- * - PUT    /carts/:cart_id/items/:item_id - Actualiza cantidad de item
- * - DELETE /carts/:cart_id/items/:item_id - Elimina item del carrito
+ * - GET    /              — Frontend del chat (página principal)
+ * - POST   /chat          — Endpoint del agente de IA
+ * - GET    /products      — Lista productos
+ * - GET    /products/:id  — Obtiene un producto
+ * - POST   /carts         — Crea un carrito nuevo
+ * - GET    /carts/:id     — Obtiene un carrito con items
+ * - POST   /carts/:id/items        — Agrega producto al carrito
+ * - PUT    /carts/:id/items/:item  — Actualiza cantidad
+ * - DELETE /carts/:id/items/:item  — Elimina item
+ * - GET    /sse           — MCP SSE endpoint (legacy)
  */
 
-import { Env } from './types';
-import { createDbClient } from './db/client';
-import { ProductService } from './services/product.service';
-import { CartService } from './services/cart.service';
-import { ProductRoutes } from './routes/products';
-import { CartRoutes } from './routes/carts';
-import { AdminRoutes } from './routes/admin';
-import { errorResponse } from './utils/errors';
-import { handleSSE } from './mcp/sse-handler';
+import { Env } from './types/index.js';
+import { createDbClient } from './db/client.js';
+import { ProductService } from './services/product.service.js';
+import { CartService } from './services/cart.service.js';
+import { ProductRoutes } from './routes/products.js';
+import { CartRoutes } from './routes/carts.js';
+import { AdminRoutes } from './routes/admin.js';
+import { ChatRoutes } from './routes/chat.js';
+import { errorResponse } from './utils/errors.js';
+import { handleSSE } from './mcp/sse-handler.js';
+import { FRONTEND_HTML } from './frontend.js';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // Configurar CORS para permitir llamadas desde cualquier origen
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
 
-    // Manejar preflight requests
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
@@ -47,84 +47,82 @@ export default {
       const productService = new ProductService(dbClient);
       const cartService = new CartService(dbClient, productService);
 
-      // Inicializar routers
-      const productRoutes = new ProductRoutes(productService);
-      const cartRoutes = new CartRoutes(cartService);
-      const adminRoutes = new AdminRoutes(productService);
+      const pathSegments = path.split('/').filter((p) => p.length > 0);
 
-      // Parsear path
-      const pathSegments = path.split('/').filter(p => p.length > 0);
+      // ── Frontend — página principal ──────────────────────────────────────
+      if (path === '/' || path === '') {
+        return new Response(FRONTEND_HTML, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
 
-      // Health check
-      if (path === '/' || path === '/health') {
+      // ── Health check ─────────────────────────────────────────────────────
+      if (path === '/health') {
         return new Response(
           JSON.stringify({
             success: true,
-            service: 'Laburen AI Agent MCP',
+            service: 'Laburen AI Agent',
             status: 'healthy',
             timestamp: new Date().toISOString(),
             endpoints: {
+              frontend: '/',
+              chat: 'POST /chat',
               rest_api: '/products, /carts',
-              mcp_sse: '/sse (Server-Sent Events)',
-              mcp_rest: '/api/tools/call (Stateless)',
-              health: '/health',
-              diagnostics: '/diagnostics'
+              mcp_sse: '/sse',
             },
-            config: {
-              sse_keepalive_interval: '15 seconds',
-              cors_enabled: true
-            }
           }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Diagnostics endpoint
+      // ── Diagnostics ───────────────────────────────────────────────────────
       if (path === '/diagnostics') {
         const testProducts = await productService.listProducts('pantalon');
         return new Response(
           JSON.stringify({
             success: true,
-            service: 'Laburen AI Agent MCP',
+            service: 'Laburen AI Agent',
             status: 'healthy',
             timestamp: new Date().toISOString(),
             tests: {
               database: testProducts.length > 0 ? 'OK' : 'FAIL',
               products_count: testProducts.length,
-              sse_endpoint: url.origin + '/sse',
-              rest_endpoint: url.origin + '/api/tools/call'
+              ai_model: '@cf/meta/llama-3.1-8b-instruct',
+              chat_endpoint: url.origin + '/chat',
             },
-            troubleshooting: {
-              chatwoot_integration: 'If agent stops after first message, use /api/tools/call instead of /sse',
-              missing_organizationId: 'Ensure user has organizationId in Laburen dashboard',
-              connection_timeout: 'SSE keep-alive is set to 10 seconds'
-            }
           }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       let response: Response;
 
-      // Routing
-      // MCP SSE endpoint
+      // ── Chat endpoint (agente de IA) ─────────────────────────────────────
+      if (path === '/chat') {
+        const chatRoutes = new ChatRoutes(productService, cartService);
+        return await chatRoutes.handleRequest(request, env);
+      }
+
+      // ── MCP SSE endpoint ──────────────────────────────────────────────────
       if (pathSegments[0] === 'sse' || path === '/sse') {
         return await handleSSE(request, productService, cartService);
-      } else if (pathSegments[0] === 'products') {
+      }
+
+      // ── REST API ──────────────────────────────────────────────────────────
+      if (pathSegments[0] === 'products') {
+        const productRoutes = new ProductRoutes(productService);
         response = await productRoutes.handleRequest(request, pathSegments.slice(1));
       } else if (pathSegments[0] === 'carts') {
+        const cartRoutes = new CartRoutes(cartService);
         response = await cartRoutes.handleRequest(request, pathSegments.slice(1));
       } else if (pathSegments[0] === 'admin') {
+        const adminRoutes = new AdminRoutes(productService);
         response = await adminRoutes.handleRequest(request, pathSegments.slice(1));
       } else {
         response = errorResponse(404, 'Ruta no encontrada', 'NOT_FOUND');
       }
 
-      // Agregar headers CORS a la respuesta
+      // Agregar headers CORS a la respuesta REST
       const headers = new Headers(response.headers);
       Object.entries(corsHeaders).forEach(([key, value]) => {
         headers.set(key, value);
@@ -133,22 +131,24 @@ export default {
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
-        headers
+        headers,
       });
-
     } catch (error) {
       console.error('Error no manejado:', error);
       const response = errorResponse(500, 'Error interno del servidor', 'INTERNAL_ERROR');
-      
+
       const headers = new Headers(response.headers);
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      };
       Object.entries(corsHeaders).forEach(([key, value]) => {
         headers.set(key, value);
       });
 
-      return new Response(response.body, {
-        status: response.status,
-        headers
-      });
+      return new Response(response.body, { status: response.status, headers });
     }
-  }
+  },
 };
+
