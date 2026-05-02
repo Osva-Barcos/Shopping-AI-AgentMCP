@@ -40,17 +40,21 @@ REGLAS ABSOLUTAS — NUNCA las ignores:
 8. Cuando muestres productos, mostrá: nombre, precio y stock disponible.
 9. Cuando muestres el carrito, usá el total que te da la tool. NO lo recalculés.
 10. Siempre preguntá si el usuario necesita algo más después de cada acción.
+11. FORMATO DE LISTAS: cada producto DEBE ir en su propia línea, empezando con • y un espacio. NUNCA pongas dos productos en la misma línea. Siempre separá con un salto de línea (\n) entre cada producto. Los productos sin stock van al final de la lista con la leyenda "(Sin stock)".
 
-Ejemplo de respuesta al mostrar productos:
+Ejemplo de respuesta al mostrar productos (notá los saltos de línea entre cada producto):
 "¡Encontré estas opciones para ti! 👕
 • Camiseta Azul Talla M — $599 (5 disponibles)
 • Camiseta Negra Talla L — $599 (3 disponibles)
+• Pantalón Verde — $1,058 (Sin stock)
+
 ¿Alguna te interesa? Te la agrego al carrito 🛒"
 
 Ejemplo de respuesta al mostrar el carrito:
 "Este es tu carrito 🛒
 • Pantalón Verde — $1,058 x 2 = $2,116
 • Camiseta Azul Talla M — $599 x 1 = $599
+
 Total: $2,715
 ¿Querés agregar algo más?"`;
 
@@ -131,6 +135,43 @@ function cleanAgentResponse(text: string): string {
   }
 
   return cleaned;
+}
+
+/**
+ * Detecta si hay productos "amontonados" (sin salto de línea entre bullets)
+ * y los separa correctamente. También asegura un salto de línea antes de la pregunta final.
+ */
+function formatProductList(text: string): string {
+  if (!text) return text;
+
+  // Paso 1: si hay bullets seguidos sin salto de línea, separarlos
+  // Ej: "• Producto A• Producto B" → "• Producto A\n• Producto B"
+  let formatted = text.replace(/([•\-]\s[^•\n]+?)\s*(?=[•\-])/g, '$1\n');
+
+  // Paso 2: si hay productos en la misma línea separados por texto sin bullet,
+  // intentar separar cuando detectamos un patrón de precio seguido de paréntesis
+  // y luego otro nombre de producto.
+  // Ej: "$1,058 (177 disponibles)• Pantalón..." → "$1,058 (177 disponibles)\n• Pantalón..."
+  formatted = formatted.replace(/(\([^)]*disponibles\)|\(Sin stock\))\s*(?=[•\-])/gi, '$1\n');
+  formatted = formatted.replace(/(\$[\d,.]+)\s*(?=[•\-]\s)/g, '$1\n');
+
+  // Paso 3: asegurar que haya un salto de línea en blanco antes de preguntas finales comunes
+  const questionPatterns = [
+    /(?<!\n\n)(¿Te interesa\s)/gi,
+    /(?<!\n\n)(¿Alguno te interesa\s)/gi,
+    /(?<!\n\n)(¿Alguna te interesa\s)/gi,
+    /(?<!\n\n)(¿Querés\s)/gi,
+    /(?<!\n\n)(¿Te gustaría\s)/gi,
+    /(?<!\n\n)(¿Necesitás\s)/gi,
+  ];
+  for (const pattern of questionPatterns) {
+    formatted = formatted.replace(pattern, '\n\n$1');
+  }
+
+  // Paso 4: eliminar líneas vacías múltiples consecutivas (más de 2)
+  formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+  return formatted.trim();
 }
 
 export class AiShopAgent {
@@ -420,7 +461,8 @@ export class AiShopAgent {
 
       if (textResponse) {
         console.log(`✅ Agent finished after ${iteration + 1} iteration(s)`);
-        const cleanedResponse = cleanAgentResponse(textResponse.trim());
+        let cleanedResponse = cleanAgentResponse(textResponse.trim());
+        cleanedResponse = formatProductList(cleanedResponse);
         return cleanedResponse;
       }
 

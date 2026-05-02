@@ -231,17 +231,38 @@ export async function executeTool(
 
         let allProducts = await productService.listProducts(searchTerm || undefined);
 
+        // Helper para generar patrones flexibles (acepta singular/plural)
+        const makeFlexiblePattern = (word: string): RegExp => {
+          const variants = new Set<string>([word]);
+          const lower = word.toLowerCase();
+          if (lower.endsWith('es')) {
+            variants.add(word.slice(0, -2));
+            variants.add(word.slice(0, -2) + 'ón');
+            variants.add(word.slice(0, -2) + 'on');
+          }
+          if (lower.endsWith('s') && !lower.endsWith('es')) {
+            variants.add(word.slice(0, -1));
+          }
+          if (!lower.endsWith('s')) {
+            variants.add(word + 's');
+            variants.add(word + 'es');
+          }
+          const pattern = Array.from(variants).map(v => `\\b${v}\\b`).join('|');
+          return new RegExp(pattern, 'i');
+        };
+
         // Filtrado post-proceso para evitar falsos positivos (ej: 'L' matcheando 'XXL')
+        // Usamos patrones flexibles para aceptar singular/plural
         if (args.size) {
           const sizePattern = new RegExp(`\\b${args.size}\\b`, 'i');
           allProducts = allProducts.filter((p) => sizePattern.test(p.name));
         }
         if (args.color) {
-          const colorPattern = new RegExp(`\\b${args.color}\\b`, 'i');
+          const colorPattern = makeFlexiblePattern(args.color);
           allProducts = allProducts.filter((p) => colorPattern.test(p.name));
         }
         if (args.type) {
-          const typePattern = new RegExp(`\\b${args.type}\\b`, 'i');
+          const typePattern = makeFlexiblePattern(args.type);
           allProducts = allProducts.filter((p) => typePattern.test(p.name));
         }
 
