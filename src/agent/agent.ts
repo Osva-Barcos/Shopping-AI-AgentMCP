@@ -19,8 +19,8 @@ import { SessionService } from '../services/session.service.js';
 import { AGENT_TOOLS, executeTool } from './tools.js';
 
 // System prompt del agente
-const SYSTEM_PROMPT = `Eres el Asistente de Compras de una tienda de moda.
-Eres amigable, entusiasta y muy útil. Siempre respondes en español.
+const SYSTEM_PROMPT = `Eres Lau, la Asistente de Compras de una tienda de moda.
+Eres amigable, entusiasta y muy útil. SIEMPRE respondes en español de Argentina.
 
 Tu trabajo:
 - Ayudar a los clientes a explorar el catálogo de productos de moda
@@ -29,20 +29,30 @@ Tu trabajo:
 - Mostrar el contenido del carrito y los totales
 - Modificar cantidades o eliminar productos del carrito
 
-Reglas importantes:
-- SOLO crea UN carrito por conversación. Guarda el cart_id y reutilízalo siempre.
-- Los precios están en pesos. Muéstralos con formato $X,XXX (ej: $1,058).
-- Sé concisa pero amigable. Usa emojis con moderación (👕 🛒 ✅).
-- Si algo falla, explica qué pasó de forma clara y ofrece alternativas.
-- Cuando muestres productos, muestra: nombre, precio y stock disponible.
-- Siempre pregunta si el usuario necesita algo más después de cada acción.
-- NUNCA describas las funciones disponibles. Si necesitas información, USA las tools directamente.
+REGLAS ABSOLUTAS — NUNCA las ignores:
+1. NUNCA hagas cálculos matemáticos vos misma. Los totales y subtotales vienen ya calculados en los resultados de las tools. Solo copiá los números tal como te los dan.
+2. NUNCA menciones nombres de funciones, variables, parámetros, ni el nombre de las tools. NO digas "la función get_cart", "el parámetro cart_id", "llamar a la tool", etc. Esas son cosas internas que el usuario NUNCA debe saber.
+3. NUNCA describas cómo funcionan las herramientas. Si necesitás información, USÁ la tool directamente y respondé con los datos obtenidos, como una vendedora real.
+4. SOLO crea UN carrito por conversación. Guarda el cart_id y reutilizalo siempre.
+5. Los precios están en pesos argentinos. Muéstralos con formato $X,XXX (ej: $1,058).
+6. Sé concisa pero amigable. Usa emojis con moderación (👕 🛒 ✅).
+7. Si algo falla, explicá qué pasó de forma clara y ofrecé alternativas.
+8. Cuando muestres productos, mostrá: nombre, precio y stock disponible.
+9. Cuando muestres el carrito, usá el total que te da la tool. NO lo recalculés.
+10. Siempre preguntá si el usuario necesita algo más después de cada acción.
 
 Ejemplo de respuesta al mostrar productos:
 "¡Encontré estas opciones para ti! 👕
 • Camiseta Azul Talla M — $599 (5 disponibles)
 • Camiseta Negra Talla L — $599 (3 disponibles)
-¿Alguna te interesa? Te la agrego al carrito 🛒"`;
+¿Alguna te interesa? Te la agrego al carrito 🛒"
+
+Ejemplo de respuesta al mostrar el carrito:
+"Este es tu carrito 🛒
+• Pantalón Verde — $1,058 x 2 = $2,116
+• Camiseta Azul Talla M — $599 x 1 = $599
+Total: $2,715
+¿Querés agregar algo más?"`;
 
 /**
  * Intenta extraer tool calls desde una respuesta de texto plano.
@@ -74,6 +84,55 @@ function parseToolCallsFromText(text: string): any[] | null {
   return null;
 }
 
+/**
+ * Limpia la respuesta del agente eliminando menciones a nombres de funciones,
+ * variables internas, o descripciones técnicas que el modelo a veces incluye.
+ */
+function cleanAgentResponse(text: string): string {
+  if (!text) return text;
+
+  // Patrones de nombres técnicos que NUNCA deben aparecer en la respuesta al usuario
+  const technicalPatterns = [
+    // Nombres de funciones/tools
+    /\b(list_products|search_products_by_attributes|get_product|create_cart|get_cart|add_to_cart|update_cart_item|remove_from_cart)\b/gi,
+    // Parámetros comunes
+    /\b(cart_id|product_id|item_id|tool_call|function_call|args|arguments)\b/gi,
+    // Frases técnicas comunes
+    /la funci[oó]n\s+[`"]\w+[`"]/gi,
+    /la tool\s+[`"]\w+[`"]/gi,
+    /voy a (llamar|usar|invocar)\s+(la funci[oó]n|la tool|el m[eé]todo)/gi,
+    /necesito (llamar|usar)\s+(una funci[oó]n|una tool)/gi,
+    /devuelve un objeto/gi,
+    /comando\s+`/gi,
+    /par[aá]metro\s+\w+/gi,
+  ];
+
+  let cleaned = text;
+
+  // Si detectamos patrones técnicos, marcamos la respuesta como sospechosa
+  const hasTechnicalContent = technicalPatterns.some((p) => p.test(text));
+
+  if (hasTechnicalContent) {
+    console.warn('⚠️ Detected technical content in response. Cleaning...');
+    // Eliminamos líneas que contengan esos patrones
+    const lines = cleaned.split('\n');
+    cleaned = lines
+      .filter((line) => {
+        const lineLower = line.toLowerCase();
+        return !technicalPatterns.some((p) => p.test(line));
+      })
+      .join('\n')
+      .trim();
+
+    // Si después de limpiar quedó muy corto o vacío, devolvemos un fallback amigable
+    if (cleaned.length < 10) {
+      return '¡Perfecto! Ya procesé tu solicitud. ¿Necesitás que te muestre algo más? 🛒';
+    }
+  }
+
+  return cleaned;
+}
+
 export class AiShopAgent {
   private productService: ProductService;
   private cartService: CartService;
@@ -99,8 +158,8 @@ export class AiShopAgent {
     }
 
     // Few-shot examples para guiar al modelo a usar tools correctamente.
-    // Solo incluimos el ejemplo de listar productos para evitar que el modelo
-    // copie IDs ficticios de carrito del ejemplo.
+    // Incluimos ejemplos de listar productos, buscar por atributos y ver carrito
+    // para que el modelo aprenda a NO calcular manualmente y a NO mencionar funciones.
     const fewShotExamples: any[] = [
       {
         role: 'user',
@@ -138,6 +197,24 @@ export class AiShopAgent {
         role: 'assistant',
         content: '¡Encontré productos en talla L! 👕\n• Pantalón Gris Talla L — $1,331 (436 disponibles)\n¿Te interesa alguno?',
       },
+      {
+        role: 'user',
+        content: 'Mostrame mi carrito',
+      },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'fs_3', name: 'get_cart', arguments: '{"cart_id":"CART_123"}' }],
+      },
+      {
+        role: 'tool',
+        content: '{"cart_id":"CART_123","items":[{"item_id":"CI_1","product_id":"0001","product_name":"Pantalón Verde","qty":2,"unit_price":1058,"subtotal":2116}],"items_count":1,"total":2116,"total_formatted":"$2,116"}',
+        tool_call_id: 'fs_3',
+      },
+      {
+        role: 'assistant',
+        content: 'Este es tu carrito 🛒\n• Pantalón Verde — $1,058 x 2 = $2,116\nTotal: $2,116\n¿Querés agregar algo más?',
+      },
     ];
 
     // Construir el array de mensajes para el LLM
@@ -166,11 +243,12 @@ export class AiShopAgent {
 
       try {
         // Modelo más robusto para function-calling
-        const modelName = '@cf/meta/llama-3.1-8b-instruct';
+        const modelName = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
         const requestBody = {
           messages,
           tools: AGENT_TOOLS,
           max_tokens: 1024,
+          temperature: 0.1,
         };
         console.log(`📤 Calling AI model: ${modelName}`);
         console.log(`📤 Request body (truncated):`, JSON.stringify(requestBody).substring(0, 500));
@@ -342,7 +420,8 @@ export class AiShopAgent {
 
       if (textResponse) {
         console.log(`✅ Agent finished after ${iteration + 1} iteration(s)`);
-        return textResponse.trim();
+        const cleanedResponse = cleanAgentResponse(textResponse.trim());
+        return cleanedResponse;
       }
 
       // Si no hay respuesta de texto ni tool calls, algo salió mal

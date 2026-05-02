@@ -295,13 +295,17 @@ export async function executeTool(
           product_name: item.product?.name || 'Producto',
           qty: item.qty,
           unit_price: item.product?.price || 0,
+          unit_price_formatted: `$${(item.product?.price || 0).toLocaleString('es-AR')}`,
           subtotal: item.subtotal,
+          subtotal_formatted: `$${(item.subtotal || 0).toLocaleString('es-AR')}`,
         }));
         result = {
           cart_id: cart.id,
           items,
           items_count: items.length,
           total: cart.total,
+          total_formatted: `$${(cart.total || 0).toLocaleString('es-AR')}`,
+          message: 'Usa los valores ya formateados (con $) tal como vienen. NO recalcules nada.',
         };
         break;
       }
