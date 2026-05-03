@@ -6,7 +6,7 @@
  * directamente contra los servicios de base de datos.
  */
 
-import { ProductService } from '../services/product.service.js';
+import { ProductService, normalizeText, SYNONYMS } from '../services/product.service.js';
 import { CartService } from '../services/cart.service.js';
 
 // ===== Definición de Tools para Cloudflare AI =====
@@ -231,39 +231,43 @@ export async function executeTool(
 
         let allProducts = await productService.listProducts(searchTerm || undefined);
 
-        // Helper para generar patrones flexibles (acepta singular/plural)
-        const makeFlexiblePattern = (word: string): RegExp => {
-          const variants = new Set<string>([word]);
-          const lower = word.toLowerCase();
-          if (lower.endsWith('es')) {
-            variants.add(word.slice(0, -2));
-            variants.add(word.slice(0, -2) + 'ón');
-            variants.add(word.slice(0, -2) + 'on');
+        /**
+         * Verifica si una palabra de búsqueda (con variantes de singular/plural/sinónimos)
+         * aparece como palabra separada en el nombre del producto.
+         * Usa normalización de acentos en vez de regex \b (que falla con acentos).
+         */
+        const wordMatches = (productName: string, searchWord: string): boolean => {
+          const normalizedName = normalizeText(productName);
+          const nameWords = normalizedName.split(/\s+/);
+          const normalizedSearch = normalizeText(searchWord);
+
+          // Generar variantes: sinónimo + singular/plural
+          const variants = new Set<string>([normalizedSearch]);
+          if (SYNONYMS[normalizedSearch]) {
+            variants.add(normalizeText(SYNONYMS[normalizedSearch]));
           }
-          if (lower.endsWith('s') && !lower.endsWith('es')) {
-            variants.add(word.slice(0, -1));
+          if (normalizedSearch.endsWith('es')) {
+            variants.add(normalizedSearch.slice(0, -2));
+          } else if (normalizedSearch.endsWith('s')) {
+            variants.add(normalizedSearch.slice(0, -1));
+          } else {
+            variants.add(normalizedSearch + 's');
+            variants.add(normalizedSearch + 'es');
           }
-          if (!lower.endsWith('s')) {
-            variants.add(word + 's');
-            variants.add(word + 'es');
-          }
-          const pattern = Array.from(variants).map(v => `\\b${v}\\b`).join('|');
-          return new RegExp(pattern, 'i');
+
+          return Array.from(variants).some(v => nameWords.includes(v));
         };
 
         // Filtrado post-proceso para evitar falsos positivos (ej: 'L' matcheando 'XXL')
-        // Usamos patrones flexibles para aceptar singular/plural
+        // Comparamos palabra por palabra normalizadas
         if (args.size) {
-          const sizePattern = new RegExp(`\\b${args.size}\\b`, 'i');
-          allProducts = allProducts.filter((p) => sizePattern.test(p.name));
+          allProducts = allProducts.filter((p) => wordMatches(p.name, args.size));
         }
         if (args.color) {
-          const colorPattern = makeFlexiblePattern(args.color);
-          allProducts = allProducts.filter((p) => colorPattern.test(p.name));
+          allProducts = allProducts.filter((p) => wordMatches(p.name, args.color));
         }
         if (args.type) {
-          const typePattern = makeFlexiblePattern(args.type);
-          allProducts = allProducts.filter((p) => typePattern.test(p.name));
+          allProducts = allProducts.filter((p) => wordMatches(p.name, args.type));
         }
 
         const limit = args.limit ?? 8;
